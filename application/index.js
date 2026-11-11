@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { metrics } from "@opentelemetry/api";
 import { MongoClient } from "mongodb";
 import mysql from "mysql2/promise";
 import { createClient } from "redis";
@@ -10,6 +11,11 @@ const required = (name) => {
   }
   return value;
 };
+
+// Métricas propias para el tablero de la caché. Si OpenTelemetry no está activo (Docker Compose), no hacen nada.
+const meter = metrics.getMeter("tienda-api");
+const cacheHits = meter.createCounter("catalog.cache.hits", { description: "Lecturas del catálogo servidas desde Redis" });
+const cacheMisses = meter.createCounter("catalog.cache.misses", { description: "Lecturas del catálogo que fueron a MariaDB" });
 
 const pool = mysql.createPool({
   host: required("DB_HOST"),
@@ -148,10 +154,12 @@ const start = async () => {
         trace.push("redis");
         const cached = await redis.get(productsCacheKey);
         if (cached) {
+          cacheHits.add(1);
           trace.push("cache hit");
           sendJson(response, 200, JSON.parse(cached), trace);
           return;
         }
+        cacheMisses.add(1);
         trace[trace.length - 1] = "redis (cache miss)";
         let dbLabel = "galera-lb";
         try {

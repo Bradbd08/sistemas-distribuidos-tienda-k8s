@@ -7,6 +7,7 @@
 </head>
 <body>
   <h1>Website node __WEB_NODE__</h1>
+  <p>Trace ID de la última consulta (pégalo en Grafana, Explore, Tempo): <code id="trace-id">aún no hay consultas</code></p>
   <section aria-labelledby="api-explorer-title">
     <h2 id="api-explorer-title">API explorer</h2>
     <label for="api-endpoint">Endpoint</label>
@@ -36,6 +37,7 @@
   <h2>Recent product reviews</h2>
   <p id="reviews-status">Loading reviews...</p>
   <ul id="reviews"></ul>
+  <script src="/telemetry.js" defer></script>
   <script src="/catalog.js" defer></script>
 </body>
 </html>

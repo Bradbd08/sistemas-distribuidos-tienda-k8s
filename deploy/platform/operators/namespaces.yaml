@@ -22,3 +22,11 @@ metadata:
   name: redis-operator
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
+---
+# Backends de observabilidad (Loki, Tempo, Mimir, Grafana) y los Collectors de OpenTelemetry.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

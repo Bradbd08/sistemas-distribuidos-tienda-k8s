@@ -1,0 +1,4 @@
+# pnpm 11+ no ejecuta los scripts de instalación de las dependencias hasta que alguien los apruebe o los niegue.
+# protobufjs trae un script opcional que no necesitamos: se niega a propósito (así el build no falla ni ejecuta nada).
+allowBuilds:
+  protobufjs: false

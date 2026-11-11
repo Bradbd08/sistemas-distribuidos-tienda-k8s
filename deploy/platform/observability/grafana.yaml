@@ -1,0 +1,106 @@
+# Grafana: tableros y alertas sobre Mimir (métricas), Loki (logs) y Tempo (trazas).
+# Entrada: http://grafana.localhost:8081 (k3d). Usuario "admin"; la contraseña está en el Secret grafana-admin
+# (credentials/dev/grafana-admin.yaml, cifrado con SOPS):
+#   kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
+# Los tableros son ConfigMaps con la etiqueta grafana_dashboard=1 (carpeta dashboards/).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: grafana
+  targetNamespace: observability
+  dependsOn:
+    - name: loki
+    - name: tempo
+  chart:
+    spec:
+      chart: grafana
+      version: 10.5.15
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+  install:
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: grafana
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 192Mi }
+      limits: { memory: 512Mi }
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      hosts:
+        - grafana.localhost
+      path: /
+      pathType: Prefix
+    grafana.ini:
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+      unified_alerting:
+        enabled: true
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        # Busca tableros en todos los namespaces (los de la app viven junto a la app).
+        searchNamespace: ALL
+        folderAnnotation: grafana_folder
+        provider:
+          foldersFromFilesStructure: true
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Mimir
+            uid: mimir
+            type: prometheus
+            access: proxy
+            url: http://mimir.observability:9009/prometheus
+            isDefault: true
+            jsonData:
+              httpMethod: POST
+              timeInterval: 15s
+          - name: Loki
+            uid: loki
+            type: loki
+            access: proxy
+            url: http://loki.observability:3100
+            jsonData:
+              # Un trace_id en el log abre la traza en Tempo.
+              derivedFields:
+                - name: trace_id
+                  matcherRegex: '"?trace_?[iI]d"?[=:]\s*"?([0-9a-f]{32})'
+                  url: "$${__value.raw}"
+                  datasourceUid: tempo
+          - name: Tempo
+            uid: tempo
+            type: tempo
+            access: proxy
+            url: http://tempo.observability:3200
+            jsonData:
+              # De una traza se saltan a los logs del mismo pod y a las métricas del servicio.
+              tracesToLogsV2:
+                datasourceUid: loki
+                spanStartTimeShift: -5m
+                spanEndTimeShift: 5m
+                filterByTraceID: false
+                filterBySpanID: false
+                customQuery: true
+                query: '{k8s_pod_name="$${__span.tags["k8s.pod.name"]}"}'
+              tracesToMetrics:
+                datasourceUid: mimir
+              nodeGraph:
+                enabled: true

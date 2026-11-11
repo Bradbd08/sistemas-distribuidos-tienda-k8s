@@ -7,13 +7,15 @@ cambio -> rama -> pull request -> CI (ci.yml) -> merge a main -> Flux de dev des
                                                       |
                                     release.yml: imágenes a GHCR, Trivy, cosign, SBOM
                                                       |
-                 tag vX.Y.Z -> imágenes X.Y.Z -> Flux image automation (prod) escribe la etiqueta en la rama release
+                 tag vX.Y.Z -> imágenes X.Y.Z -> Flux image automation (prod) escribe la etiqueta en flux-image-updates
+                                                      |
+                                  pull request flux-image-updates -> release (aprobación = puerta de promoción)
 ```
 
 | Entorno | Clúster | Rama que sigue Flux | Imágenes |
 |---|---|---|---|
 | dev | k3d `tienda` (3 servidores con etcd) | `main` | registro local `tienda-registry:5000` (etiqueta `dev`) |
-| prod | las dos laptops (K3s real) | `release` (se llega con un pull request de `main`) | GHCR `ghcr.io/bradbd08/tienda-{web,api}` |
+| prod | las dos laptops (K3s real) | `release`, protegida: solo entra lo aprobado por pull request | GHCR `ghcr.io/bradbd08/tienda-{web,api}` |
 
 ## Terraform (`infra/terraform`)
 
@@ -40,7 +42,7 @@ Cuatro capas con `dependsOn`: `operators`, `secrets`, `data`, `apps` y `network-
 | Caso de uso del plan | Cómo se resuelve |
 |---|---|
 | Arranque del clúster | Terraform instala Flux y lo apunta a `clusters/<entorno>` |
-| Promoción entre entornos | dev sigue `main`; prod sigue `release`, y a `release` solo se llega por pull request |
+| Promoción entre entornos | dev sigue `main`; prod sigue `release` (protegida: pull request con 1 aprobación; el dueño puede saltarla). La promoción es un pull request a `release`, de `main` (manifiestos) o de `flux-image-updates` (etiquetas de imagen) |
 | Orden de dependencias | `dependsOn` con `wait: true` |
 | Corrección de deriva y rollback | Flux revierte cambios manuales; el rollback es `git revert` |
 | Secretos | SOPS con age: `credentials/<entorno>/*.yaml` cifrado; Flux descifra con `flux-system/sops-age` |
@@ -70,7 +72,7 @@ secretos de variables de entorno, 12-factor) y `CKV_K8S_43` (sin digest: dev usa
 |---|---|
 | `terraform plan/apply` en CI | El estado vive dentro de los clústeres y Terraform necesita permisos de administrador del repo: los runners de GitHub no pueden. Los jobs están escritos pero solo corren con un runner autoalojado en la laptop A y `TF_SELF_HOSTED=true`. **No probado** |
 | Image automation | Escrita y validada con kubeconform, pero **no probada**: necesita el clúster real y credenciales de GHCR (los paquetes de un repo privado son privados) |
-| Aprobación manual y protección de ramas | Dependen del plan de GitHub para repos privados |
+| Aprobación manual en `terraform.yml` | Los *environments* con revisores obligatorios dependen del plan de GitHub para repos privados |
 | Pruebas unitarias | La API no tiene todavía; el CI solo revisa que compile |
 | Firma con cosign | Sin llaves: la identidad del workflow (repositorio y commit) queda en el registro público Rekor |
 | Clave age | Está en `~/.config/sops/age/keys.txt` de la laptop A. Si se pierde no se pueden editar los Secrets cifrados (se regeneran): hay que respaldarla |

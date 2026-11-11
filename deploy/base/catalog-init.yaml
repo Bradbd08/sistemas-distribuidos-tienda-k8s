@@ -29,6 +29,9 @@ spec:
       containers:
         - name: init
           image: tienda-api
+          # Always: la etiqueta dev es mutable (scripts/build-images.sh la reemplaza) y con IfNotPresent los
+          # nodos seguirían usando la imagen anterior.
+          imagePullPolicy: Always
           command: ["node", "init-db.js"]
           envFrom:
             - configMapRef:

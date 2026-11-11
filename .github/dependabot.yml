@@ -1,0 +1,29 @@
+# Dependabot abre pull requests cuando salen versiones nuevas (el CI los valida).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Imágenes base de web y API.
+  - package-ecosystem: docker
+    directories:
+      - /web
+      - /application
+    schedule:
+      interval: weekly
+
+  # Dependencias de la API (pnpm).
+  - package-ecosystem: npm
+    directory: /application
+    schedule:
+      interval: weekly
+
+  # Providers de Terraform.
+  - package-ecosystem: terraform
+    directories:
+      - /infra/terraform/envs/*
+      - /infra/terraform/modules/*
+    schedule:
+      interval: weekly

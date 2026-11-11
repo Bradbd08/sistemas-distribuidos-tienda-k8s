@@ -1,0 +1,200 @@
+name: CI
+
+# En cada pull request: lint, build de las imágenes, Trivy, validación de Terraform y de los manifiestos.
+# Las acciones están fijadas por SHA de commit (el comentario dice la versión). Dependabot las actualiza.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codigo:
+    name: Scripts y API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: shellcheck de los scripts
+        run: shellcheck scripts/*.sh
+
+      # Los workflows se validan a sí mismos (imagen fijada por digest).
+      - name: actionlint de los workflows
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo \
+            rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # Todavía no hay pruebas unitarias de la API: esto solo revisa que el código compile.
+      - name: Sintaxis de la API
+        run: |
+          node --check application/index.js
+          node --check application/init-db.js
+
+      - name: catalog.sql y su copia para Kustomize son idénticos
+        run: diff -u database/catalog.sql deploy/base/catalog-init/catalog.sql
+
+  manifiestos:
+    name: Manifiestos y Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # El mismo script que usa el equipo: así también se prueba que funciona en Ubuntu (WSL2).
+      - name: Herramientas del clúster
+        run: |
+          bash scripts/install-cli-tools.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: kubeconform en cada capa
+        run: |
+          set -euo pipefail
+          schemas='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          check() { kubeconform -strict -summary -kubernetes-version 1.37.2 -schema-location default -schema-location "$schemas" -ignore-missing-schemas "$@"; }
+          for d in deploy/overlays/dev deploy/overlays/prod deploy/platform/operators deploy/platform/data \
+                   deploy/platform/network-policies deploy/platform/notifications; do
+            echo "== $d"
+            kubectl kustomize "$d" | check
+          done
+          # Flux genera el kustomization de clusters/<entorno>, así que se validan los archivos sueltos
+          # (sin la carpeta flux-system, que es de Flux).
+          echo "== clusters"
+          check clusters/*/*.yaml
+
+      - name: Los Secrets de credentials/ están cifrados con SOPS
+        run: |
+          for f in credentials/*/*.yaml; do
+            if ! grep -q '^sops:' "$f" || ! grep -q 'ENC\[AES256_GCM' "$f"; then
+              echo "::error file=$f::Secret sin cifrar. Cífralo con: sops --encrypt --in-place $f"
+              exit 1
+            fi
+          done
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      # Se revisa lo que de verdad se despliega (overlay + NetworkPolicies, renderizados juntos).
+      # Excepciones elegidas a propósito:
+      #   CKV_K8S_11  sin límite de CPU: un límite provoca throttling; sí hay requests y el HPA escala por CPU.
+      #   CKV_K8S_35  los secretos van por variable de entorno porque la API (12-factor) los lee de ahí.
+      #   CKV_K8S_43  sin digest: dev usa la etiqueta mutable "dev"; prod toma etiquetas de Flux image automation.
+      - name: checkov sobre los manifiestos renderizados
+        run: |
+          { kubectl kustomize deploy/overlays/dev; echo '---'; kubectl kustomize deploy/platform/network-policies; } > "$RUNNER_TEMP/dev-all.yaml"
+          uvx checkov@3.4.4 -f "$RUNNER_TEMP/dev-all.yaml" --framework kubernetes --compact --quiet \
+            --skip-check CKV_K8S_11,CKV_K8S_35,CKV_K8S_43
+
+      - name: Trivy, misconfiguraciones en deploy/
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: deploy
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          version: v0.76.2
+
+      - name: Trivy, misconfiguraciones en infra/
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra/terraform
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          version: v0.76.2
+
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.66.0
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff infra/terraform
+
+      # -backend=false: en CI no hay acceso al estado (vive dentro de los clústeres).
+      - name: terraform validate en cada entorno
+        run: |
+          set -euo pipefail
+          for env in dev prod-nodes prod; do
+            echo "== $env"
+            terraform -chdir=infra/terraform/envs/$env init -backend=false -input=false
+            terraform -chdir=infra/terraform/envs/$env validate
+          done
+
+      - name: Pruebas del módulo network
+        run: |
+          terraform -chdir=infra/terraform/modules/network init -backend=false -input=false
+          terraform -chdir=infra/terraform/modules/network test
+
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tflint --init --config "$PWD/infra/terraform/.tflint.hcl"
+          cd infra/terraform
+          tflint --config "$PWD/.tflint.hcl" --recursive
+
+      - name: checkov sobre Terraform
+        run: uvx checkov@3.4.4 -d infra/terraform --framework terraform --compact --quiet
+
+  imagenes:
+    name: Imagen ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tienda-web
+            context: web
+          - name: tienda-api
+            context: application
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Construir (sin subir)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          load: true
+          push: false
+          tags: ${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # Solo vulnerabilidades altas o críticas que ya tienen arreglo: lo demás no se puede corregir todavía.
+      - name: Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ matrix.name }}:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          version: v0.76.2

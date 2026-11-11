@@ -1,0 +1,4 @@
+# Etiquetas de runners autoalojados que usan los workflows (terraform.yml).
+self-hosted-runner:
+  labels:
+    - tienda

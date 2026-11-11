@@ -1,0 +1,23 @@
+# Entrada de Flux para el clúster real de las dos laptops (prod). Sigue la rama release:
+# solo llega lo que se aprueba por pull request de main a release.
+# Orden de despliegue (dependsOn): operators -> secrets -> data -> apps -> network-policies.
+# Cada capa espera a que la anterior esté lista.
+#
+# Regla de datos: ninguna capa que tenga bases de datos o Secrets usa prune. Si alguien borra un archivo
+# del repo, Flux NO borra la base ni sus volúmenes.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: operators
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/platform/operators
+  prune: true
+  wait: true
+  deletionPolicy: Orphan

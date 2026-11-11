@@ -1,17 +1,18 @@
-# Producción (clúster real de 2 laptops): imágenes de GHCR y 3 réplicas mínimas.
-# PENDIENTE (Etapa 2): reemplazar OWNER/REPO por el dueño y nombre del repo privado de GitHub, y
-# la etiqueta por la que publique release.yml (sha-<commit>). Hasta entonces este overlay no se despliega.
+# Producción (clúster real de 2 laptops): imágenes de GHCR, 3 réplicas mínimas y credenciales para GHCR.
+# Las etiquetas las actualiza Flux image automation (clusters/prod/image-automation.yaml) con los
+# marcadores $imagepolicy: no las edites a mano. 0.1.0 es la primera versión: se publica con
+#   git tag v0.1.0 && git push origin v0.1.0     (release.yml construye y firma las imágenes)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
 images:
   - name: tienda-web
-    newName: ghcr.io/OWNER/REPO/tienda-web
-    newTag: PENDIENTE
+    newName: ghcr.io/bradbd08/tienda-web # {"$imagepolicy": "flux-system:tienda-web:name"}
+    newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-web:tag"}
   - name: tienda-api
-    newName: ghcr.io/OWNER/REPO/tienda-api
-    newTag: PENDIENTE
+    newName: ghcr.io/bradbd08/tienda-api # {"$imagepolicy": "flux-system:tienda-api:name"}
+    newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-api:tag"}
 patches:
   # 3 réplicas mínimas (en dev son 2).
   - target:
@@ -20,3 +21,18 @@ patches:
       - op: replace
         path: /spec/minReplicas
         value: 3
+  # Los paquetes de GHCR son privados: los pods los bajan con el Secret ghcr-pull (namespace tienda).
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ghcr-pull
+  - target:
+      kind: Job
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ghcr-pull

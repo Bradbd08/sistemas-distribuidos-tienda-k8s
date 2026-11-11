@@ -60,12 +60,15 @@ Las dos laptops del equipo:
 | Terraform | 1.17.1 | infraestructura como código | `terraform version` |
 | kubeconform | 0.8.0 | validar manifiestos | `kubeconform -v` |
 | k3d | 5.9.0 | clúster K3s dentro de Docker (desarrollo) | `k3d version` |
+| sops | 3.13.3 | cifrar los Secrets que van a git | `sops --version` |
+| age | 1.3.2 | claves de SOPS | `age --version` |
+| tflint | 0.66.0 | linter de Terraform | `tflint --version` |
 | K3s | v1.37.2+k3s1 | clúster real (sección 6) | `k3s --version` |
 
 ### 3.3 Instalar las herramientas del clúster (sin sudo)
 
 ```bash
-bash scripts/install-cli-tools.sh          # instala kubectl, helm, flux, terraform, kubeconform y k3d en ~/.local/bin
+bash scripts/install-cli-tools.sh          # instala kubectl, helm, flux, terraform, kubeconform, k3d, sops, age y tflint en ~/.local/bin
 bash scripts/install-cli-tools.sh --check  # solo revisa (código 1 si falta algo)
 ```
 
@@ -177,6 +180,47 @@ kubectl -n tienda get mariadb,maxscale,mongodbcommunity,redisreplication   # tod
 **Cambiar el código y redesplegar:** `bash scripts/build-images.sh dev && kubectl -n tienda rollout restart deploy/api deploy/web`.
 
 **Qué reemplaza a qué (Compose → Kubernetes):** HAProxy y Keepalived → Ingress de Traefik y Services; `web1-3` → Deployment `web`; `app1-3` → Deployment `api`; `galera1-3` y `galera-lb` → MariaDB Galera + MaxScale (Service `maxscale`); `mongodb` → replica set de 3 miembros; `redis` → master, 2 réplicas y 3 Sentinel (Service `redis-master`); las redes `edge`, `application` y `database` → NetworkPolicies.
+
+### 5.2 GitOps: Terraform, Flux y SOPS (fases 1, 4 y 5)
+
+Desde la Etapa 2, en dev **Flux** sigue la rama `main` de https://github.com/Bradbd08/sistemas-distribuidos-tienda-k8s: lo que hacen a mano los
+pasos 2, 4, 6 y 7 de la sección 5.1 lo hace Flux a partir de Git. Cambiar el clúster es: rama, pull request, CI en verde, merge a `main`, y Flux despliega.
+Qué hace cada pieza: [`docs/02-gitops-iac-cicd.md`](docs/02-gitops-iac-cicd.md).
+
+**Arrancar Flux con Git en un clúster k3d nuevo** (una vez). Con Flux, las contraseñas salen de `credentials/dev/` (cifradas): NO corras
+`scripts/create-dev-secrets.sh`, que es solo para el flujo manual de la 5.1.
+
+```bash
+# 1) Namespace de Flux y la clave que descifra los Secrets (la clave privada nunca va a git; respáldala)
+kubectl create namespace flux-system
+kubectl -n flux-system create secret generic sops-age --from-file=age.agekey="$HOME/.config/sops/age/keys.txt"
+
+# 2) Imágenes al registro local (Flux las usa en dev)
+bash scripts/build-images.sh dev
+
+# 3) Terraform arranca Flux. El token de gh solo registra la llave de despliegue en GitHub; no se guarda.
+terraform -chdir=infra/terraform/envs/dev init
+GITHUB_TOKEN="$(gh auth token)" terraform -chdir=infra/terraform/envs/dev apply
+```
+
+**Verificar:**
+
+```bash
+flux get kustomizations      # operators, secrets, data, apps y network-policies en True (notifications suspendida)
+kubectl -n tienda get pods   # todo Ready
+```
+
+**Secretos con SOPS** (`SOPS_AGE_KEY_FILE` apunta a la clave privada):
+
+```bash
+export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
+sops credentials/dev/mariadb-credentials.yaml       # editar: descifra y vuelve a cifrar al guardar
+sops --encrypt --in-place credentials/dev/<nuevo>.yaml
+```
+
+**Forzar una reconciliación:** `flux reconcile source git flux-system && flux reconcile kustomization apps`.
+
+**Si algo se rompe después de reiniciar la laptop:** mira [`docs/hallazgos.md`](docs/hallazgos.md) (filas 5 a 7). El caso más común está en la sección 7.
 
 ## 6. Parte 2, modo entrega: clúster K3s real, un nodo por laptop
 
@@ -301,6 +345,12 @@ Cómo llegan las imágenes a la laptop B (GHCR o registro local), cómo se despl
 - La API se conecta a `galera1` directo en Compose (`DB_HOST: galera1`), aunque el README dice `galera-lb`. Si `galera1` cae, la API falla. En Kubernetes esto se resuelve con un proxy de base de datos.
 - HAProxy (Parte 1) no tiene `option redispatch`: cuando un nodo web cae por pocos segundos, las peticiones que le tocan esperan hasta ~8 s. Se midió en las pruebas de Chaos Monkey.
 - El README de la Parte 1 dice Nagios en el puerto 8080 con clave `nagios`. Lo real es el puerto 8088 y la clave del `.env`.
+- **Reinicio de la laptop con k3d:** si `kubectl` responde `ServiceUnavailable` más de 2 minutos, Docker pudo reasignar las IP de los nodos (etcd las busca en las direcciones viejas y no forma quórum). Compruébalo y recupéralo sin borrar nada:
+  ```bash
+  docker inspect -f '{{.Name}} {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' k3d-tienda-server-0 k3d-tienda-server-1 k3d-tienda-server-2   # esperado: .2, .3 y .4
+  docker stop k3d-tienda-server-1 k3d-tienda-server-2 && docker start k3d-tienda-server-1 && docker start k3d-tienda-server-2   # en este orden
+  ```
+  Los datos se conservan. Las bases tardan unos minutos en recuperarse (Galera ejecuta su procedimiento de recuperación).
 - **MongoDB:** el plan nombra al "MongoDB Community Operator", pero ese repositorio está archivado desde noviembre de 2025. Se usa su sucesor, MongoDB Controllers for Kubernetes (chart `mongodb-kubernetes` 1.15.0), que trae el mismo recurso `MongoDBCommunity`. Solo vigila el namespace donde corre, por eso su operador está en `tienda`.
 - **MaxScale** (proxy de MariaDB) tiene licencia BSL: es gratis para este proyecto, pero no es software libre.
 - **Redis:** la imagen que usa el operador es `redis:v7.0.15`, antigua. Trivy puede marcarla en CI; si pasa, se actualiza la etiqueta en `deploy/platform/data/redis.yaml`.
@@ -315,6 +365,7 @@ Cómo llegan las imágenes a la laptop B (GHCR o registro local), cómo se despl
 - [ ] La tienda responde desde el clúster (HTTP 200 y la traza pasa por los pods).
 - [ ] Documentación de la implementación (carpeta `docs/`).
 - [ ] Resultados de las pruebas de desempeño (carpeta `docs/resultados/`).
+- [ ] CI en verde en `main` y `flux get kustomizations` con todo en `True` en los dos clústeres.
 - [ ] Repositorio del proyecto en GitHub, sin secretos (`git log -p | grep -i password` no debe mostrar claves reales).
 
 ## 9. Texto para pegarle al agente de IA

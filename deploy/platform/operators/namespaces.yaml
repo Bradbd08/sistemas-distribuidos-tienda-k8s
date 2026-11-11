@@ -1,17 +1,24 @@
 # Namespaces que necesitan los operadores y la aplicación.
 # "tienda" aloja la aplicación, las bases de datos y el operador de MongoDB: ese operador solo vigila
 # el namespace donde se instala (WATCH_NAMESPACE sale del propio pod).
+# La anotación prune: disabled impide que Flux borre un namespace (y con él los volúmenes) por error.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: mariadb-operator
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: redis-operator
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

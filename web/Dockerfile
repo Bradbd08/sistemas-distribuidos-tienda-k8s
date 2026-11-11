@@ -1,5 +1,11 @@
 FROM nginxinc/nginx-unprivileged:1.31-alpine
 
+# Actualiza los paquetes de Alpine con parches publicados después de la imagen base (Trivy los marca).
+# La imagen vuelve a correr sin root después.
+USER root
+RUN apk upgrade --no-cache
+USER 101
+
 # El entrypoint de la imagen procesa esta plantilla con envsubst al arrancar (solo las variables
 # que cumplen NGINX_ENVSUBST_FILTER) y escribe /etc/nginx/conf.d/default.conf.
 COPY templates/default.conf.template /etc/nginx/templates/default.conf.template

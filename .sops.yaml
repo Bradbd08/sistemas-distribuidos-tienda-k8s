@@ -1,0 +1,10 @@
+# Configuración de SOPS: cifra solo los valores (data y stringData) de los Secrets de Kubernetes.
+# La clave pública es segura de publicar. La privada vive en ~/.config/sops/age/keys.txt (no va a git)
+# y, en el clúster, en el Secret flux-system/sops-age para que Flux descifre.
+# Cifrar un Secret nuevo:   sops --encrypt --in-place credentials/dev/<archivo>.yaml
+# Editar uno existente:     sops credentials/dev/<archivo>.yaml
+creation_rules:
+  - path_regex: ^credentials/dev/.*\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1xdx9qjcmuf4zh0v4g09nmv58nqhaf27wu060rjxx06l92qwv73lq47c7d3
+  # prod: tendrá su propia clave age cuando exista el clúster real (Etapa 6), para que la de dev no pueda descifrarlo.

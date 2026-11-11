@@ -37,3 +37,6 @@ backups/
 **/backups/
 
 .DS_Store
+
+# Scripts de instalación de K3s que genera infra/terraform/envs/prod-nodes (llevan IP de Tailscale).
+generated/

@@ -1,0 +1,33 @@
+# Flux avisa a GitHub del resultado de cada reconciliación (aparece como estado del commit).
+#
+# Para activarlo (lo hace una persona, porque necesita un token de GitHub):
+#   1. En GitHub: Settings > Developer settings > Fine-grained tokens. Repositorio: solo este.
+#      Permiso: "Commit statuses: Read and write". Nada más.
+#   2. Guárdalo cifrado, sin pegarlo en ningún chat:
+#        kubectl -n flux-system create secret generic github-token --from-literal=token="$(read -rs t; echo $t)" \
+#          --dry-run=client -o yaml > credentials/dev/github-token.yaml
+#        sops --encrypt --in-place credentials/dev/github-token.yaml
+#   3. Haz commit y push, y reanuda:  flux resume kustomization notifications
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Provider
+metadata:
+  name: github-status
+  namespace: flux-system
+spec:
+  type: github
+  address: https://github.com/Bradbd08/sistemas-distribuidos-tienda-k8s
+  secretRef:
+    name: github-token
+---
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Alert
+metadata:
+  name: github-status
+  namespace: flux-system
+spec:
+  providerRef:
+    name: github-status
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: "*"

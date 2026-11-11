@@ -6,6 +6,8 @@ kind: RedisReplication
 metadata:
   name: redis
   namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   clusterSize: 3
   # Una caída voluntaria (drenar un nodo) a la vez.

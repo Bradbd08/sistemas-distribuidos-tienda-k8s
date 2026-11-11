@@ -17,6 +17,13 @@ FLUX_VERSION="2.10.0"
 TERRAFORM_VERSION="1.17.1"
 KUBECONFORM_VERSION="0.8.0"
 K3D_VERSION="5.9.0"           # K3s dentro de Docker, para desarrollar en una sola laptop
+SOPS_VERSION="3.13.3"         # cifra los Secrets que van a git
+AGE_VERSION="1.3.2"           # claves que usa SOPS
+TFLINT_VERSION="0.66.0"       # linter de Terraform
+
+# age no publica un archivo de sumas: estas son las SHA-256 de los .tar.gz de la versión fijada.
+AGE_SHA256_AMD64="cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10"
+AGE_SHA256_ARM64="6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4"
 
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 MODO="instalar"
@@ -59,6 +66,15 @@ verificar() {
   fi
 }
 
+# descomprimir_zip <zip> <archivo dentro> <carpeta destino>
+descomprimir_zip() {
+  if command -v unzip > /dev/null 2>&1; then
+    unzip -q -o "$1" "$2" -d "$3"
+  else
+    python3 -I -m zipfile -e "$1" "$3"
+  fi
+}
+
 # version_de <herramienta>: imprime la versión instalada en BIN_DIR, o nada.
 version_de() {
   case "$1" in
@@ -68,6 +84,9 @@ version_de() {
     terraform)   "$BIN_DIR/terraform" version 2> /dev/null | sed -n '1s/^Terraform v//p' ;;
     kubeconform) "$BIN_DIR/kubeconform" -v 2> /dev/null | sed 's/^v//' ;;
     k3d)         "$BIN_DIR/k3d" version 2> /dev/null | sed -n '1s/^k3d version v//p' ;;
+    sops)        "$BIN_DIR/sops" --version 2> /dev/null | sed -n '1s/^sops \([0-9.]*\).*/\1/p' ;;
+    age)         "$BIN_DIR/age" --version 2> /dev/null | sed 's/^v//' ;;
+    tflint)      "$BIN_DIR/tflint" --version 2> /dev/null | sed -n '1s/^TFLint version //p' ;;
   esac
 }
 
@@ -108,11 +127,7 @@ instalar_terraform() {
   bajar "$base/$archivo" "$T/$archivo"
   bajar "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS" "$T/sumas"
   verificar "$T/$archivo" "$(suma_de "$T/sumas" "$archivo")"
-  if command -v unzip > /dev/null 2>&1; then
-    unzip -q -o "$T/$archivo" terraform -d "$T"
-  else
-    python3 -I -m zipfile -e "$T/$archivo" "$T"
-  fi
+  descomprimir_zip "$T/$archivo" terraform "$T"
   install -m 0755 "$T/terraform" "$BIN_DIR/terraform"
 }
 
@@ -134,6 +149,41 @@ instalar_k3d() {
   bajar "$base/checksums.txt" "$T/sumas"
   verificar "$T/k3d-linux-$ARCH" "$(suma_de "$T/sumas" "k3d-linux-$ARCH")"
   install -m 0755 "$T/k3d-linux-$ARCH" "$BIN_DIR/k3d"
+}
+
+instalar_sops() {
+  nueva_carpeta
+  local archivo="sops-v${SOPS_VERSION}.linux.${ARCH}"
+  local base="https://github.com/getsops/sops/releases/download/v$SOPS_VERSION"
+  bajar "$base/$archivo" "$T/$archivo"
+  bajar "$base/sops-v${SOPS_VERSION}.checksums.txt" "$T/sumas"
+  verificar "$T/$archivo" "$(suma_de "$T/sumas" "$archivo")"
+  install -m 0755 "$T/$archivo" "$BIN_DIR/sops"
+}
+
+instalar_age() {
+  nueva_carpeta
+  local archivo="age-v${AGE_VERSION}-linux-${ARCH}.tar.gz" esperada
+  case "$ARCH" in
+    amd64) esperada="$AGE_SHA256_AMD64" ;;
+    arm64) esperada="$AGE_SHA256_ARM64" ;;
+  esac
+  bajar "https://github.com/FiloSottile/age/releases/download/v$AGE_VERSION/$archivo" "$T/$archivo"
+  verificar "$T/$archivo" "$esperada"
+  tar -xzf "$T/$archivo" -C "$T" age/age age/age-keygen
+  install -m 0755 "$T/age/age" "$BIN_DIR/age"
+  install -m 0755 "$T/age/age-keygen" "$BIN_DIR/age-keygen"
+}
+
+instalar_tflint() {
+  nueva_carpeta
+  local archivo="tflint_linux_${ARCH}.zip"
+  local base="https://github.com/terraform-linters/tflint/releases/download/v$TFLINT_VERSION"
+  bajar "$base/$archivo" "$T/$archivo"
+  bajar "$base/checksums.txt" "$T/sumas"
+  verificar "$T/$archivo" "$(suma_de "$T/sumas" "$archivo")"
+  descomprimir_zip "$T/$archivo" tflint "$T"
+  install -m 0755 "$T/tflint" "$BIN_DIR/tflint"
 }
 
 FALTAN=0
@@ -168,6 +218,9 @@ procesar flux "$FLUX_VERSION" instalar_flux
 procesar terraform "$TERRAFORM_VERSION" instalar_terraform
 procesar kubeconform "$KUBECONFORM_VERSION" instalar_kubeconform
 procesar k3d "$K3D_VERSION" instalar_k3d
+procesar sops "$SOPS_VERSION" instalar_sops
+procesar age "$AGE_VERSION" instalar_age
+procesar tflint "$TFLINT_VERSION" instalar_tflint
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;

@@ -1,0 +1,5 @@
+# Copia a terraform.tfvars (no va a git) y pon las IP que muestra `tailscale ip -4` en cada laptop.
+nodes = {
+  lap-a = { ip = "100.64.0.1", role = "server" } # laptop A (Manjaro): servidor
+  lap-b = { ip = "100.64.0.2", role = "agent" }  # laptop B (Windows + WSL2): agente
+}

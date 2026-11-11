@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Generado por Terraform (infra/terraform/modules/k3s-nodes). No lo edites: cambia las variables y vuelve a aplicar.
+# Instala el servidor K3s ${node_name} (${ip}). Necesita sudo: lo corre una persona.
+set -euo pipefail
+
+%{ if cluster_init ~}
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${k3s_version}" sh -s - server \
+  --cluster-init --node-name ${node_name} --node-ip ${ip} --advertise-address ${ip} \
+  --tls-san ${ip} --secrets-encryption ${common_flags} ${server_flags}
+%{ else ~}
+read -rs -p "Token del servidor (no se muestra): " K3S_TOKEN
+echo
+export K3S_TOKEN
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${k3s_version}" sh -s - server \
+  --server https://${server_ip}:6443 --node-name ${node_name} --node-ip ${ip} --advertise-address ${ip} \
+  --tls-san ${ip} --secrets-encryption ${common_flags} ${server_flags}
+%{ endif ~}
+
+sudo k3s kubectl get nodes
+%{ if cluster_init ~}
+echo "Token para unir los demás nodos (secreto: pásalo por un canal privado, nunca por git):"
+echo "  sudo cat /var/lib/rancher/k3s/server/node-token"
+%{ endif ~}

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Generado por Terraform (infra/terraform/modules/k3s-nodes). No lo edites: cambia las variables y vuelve a aplicar.
+# Une el nodo ${node_name} (${ip}) al clúster como agente. Necesita sudo: lo corre una persona.
+set -euo pipefail
+
+read -rs -p "Token del servidor (no se muestra): " K3S_TOKEN
+echo
+export K3S_TOKEN
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${k3s_version}" K3S_URL="https://${server_ip}:6443" \
+  sh -s - agent --node-name ${node_name} --node-ip ${ip} ${common_flags}
+
+sudo systemctl status k3s-agent --no-pager

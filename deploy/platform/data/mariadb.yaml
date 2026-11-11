@@ -6,6 +6,8 @@ kind: MariaDB
 metadata:
   name: mariadb
   namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   image: mariadb:11.4.13
   replicas: 3
@@ -41,6 +43,8 @@ kind: MaxScale
 metadata:
   name: maxscale
   namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   image: mariadb/maxscale:24.02.9
   mariaDbRef:

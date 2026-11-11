@@ -1,0 +1,7 @@
+# Copia este archivo a terraform.tfvars (no va a git) solo si necesitas cambiar algo.
+# Los valores por defecto ya apuntan a este repositorio y al clúster k3d "tienda".
+github_owner      = "Bradbd08"
+github_repository = "sistemas-distribuidos-tienda-k8s"
+branch            = "main"
+kube_config_path  = "~/.kube/config"
+kube_context      = "k3d-tienda"

@@ -115,6 +115,12 @@ spec:
               app: mongodb-svc
       ports:
         - { protocol: TCP, port: 27017 }
+    # La sonda de disponibilidad del agente lee el Secret "mongodb-config" de la API de Kubernetes.
+    # Sin esta salida el pod nunca queda Ready al reiniciar (y, como el StatefulSet arranca en orden,
+    # los miembros 1 y 2 ni se crean).
+    - ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 6443 }
 ---
 # Redis y Sentinel: la API usa el master (6379); entre ellos hablan por 6379 y 26379; el operador los administra.
 apiVersion: networking.k8s.io/v1

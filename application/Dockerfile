@@ -10,6 +10,10 @@ RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
+# npm no se usa (instalamos con pnpm y arrancamos con "node"). Quitarlo elimina sus dependencias
+# empaquetadas, que son las que Trivy marcaba, y reduce la superficie de ataque.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 COPY index.js init-db.js ./
 
 USER node

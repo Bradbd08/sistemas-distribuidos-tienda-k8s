@@ -1,0 +1,18 @@
+# La tienda (web, API, Job de inicialización, Ingress). En dev usa las imágenes del registro del clúster.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 10m
+  dependsOn:
+    - name: data
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/overlays/dev
+  prune: true
+  wait: true

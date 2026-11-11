@@ -1,0 +1,91 @@
+# Capa web y de aplicación: Traefik -> web -> api -> bases de datos.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Solo Traefik (el Ingress de K3s) entra a la web.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: maxscale
+      ports:
+        - { protocol: TCP, port: 3306 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb-svc
+      ports:
+        - { protocol: TCP, port: 27017 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - { protocol: TCP, port: 6379 }
+---
+# Job de inicialización: crea el esquema en MariaDB y los índices en MongoDB.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: catalog-init
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: catalog-init
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: maxscale
+      ports:
+        - { protocol: TCP, port: 3306 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb-svc
+      ports:
+        - { protocol: TCP, port: 27017 }

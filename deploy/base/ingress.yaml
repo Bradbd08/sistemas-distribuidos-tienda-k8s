@@ -1,0 +1,35 @@
+# Entrada: reemplaza a presentation-entry, presentation-lb-* y Keepalived de Compose.
+# Traefik (viene con K3s) hace de balanceador. Este Middleware agrega la cabecera que la API
+# registra en la traza de la página (en Compose la ponía HAProxy).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: presentation-lb
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  headers:
+    customRequestHeaders:
+      X-Presentation-LB: traefik
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tienda
+  labels:
+    app.kubernetes.io/part-of: tienda
+  annotations:
+    # Formato: <namespace>-<nombre del Middleware>@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: tienda-presentation-lb@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

@@ -1,0 +1,33 @@
+# Plantilla de nginx para Kubernetes (la configuración de Docker Compose sigue en web/nginx.conf).
+# Solo se reemplaza ${API_UPSTREAM}; las variables de nginx ($host, $hostname...) quedan intactas.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Cada pod muestra su propio nombre en la página (en Compose había un index.html por nodo).
+    sub_filter '__WEB_NODE__' '$hostname';
+    sub_filter_once off;
+
+    # Sonda de Kubernetes: el proceso responde. No depende de la API.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /api/ {
+        proxy_pass http://${API_UPSTREAM}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # Traefik (el Ingress) pone X-Presentation-LB; aquí solo se reenvía a la API.
+        proxy_set_header X-Presentation-LB $http_x_presentation_lb;
+        proxy_set_header X-Web-Node $hostname;
+        proxy_set_header X-Application-LB service/api;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

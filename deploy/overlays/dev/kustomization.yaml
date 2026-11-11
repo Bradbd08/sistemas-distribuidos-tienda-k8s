@@ -1,0 +1,12 @@
+# Desarrollo: imágenes del registro del clúster k3d (scripts/build-images.sh las sube).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: tienda-web
+    newName: tienda-registry:5000/tienda-web
+    newTag: dev
+  - name: tienda-api
+    newName: tienda-registry:5000/tienda-api
+    newTag: dev

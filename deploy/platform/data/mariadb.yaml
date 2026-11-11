@@ -1,0 +1,62 @@
+# MariaDB Galera (3 nodos) con MaxScale como proxy. Reemplaza a galera1-3 y galera-lb de Compose.
+# La API se conecta al Service "maxscale" (puerto 3306).
+# Las contraseñas viven en el Secret "mariadb-credentials" (scripts/create-dev-secrets.sh en dev, SOPS en prod).
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: mariadb
+  namespace: tienda
+spec:
+  image: mariadb:11.4.13
+  replicas: 3
+  rootPasswordSecretKeyRef:
+    name: mariadb-credentials
+    key: root-password
+  # Base y usuario iniciales, como MARIADB_DATABASE y MARIADB_USER en Compose.
+  database: store
+  username: store_app
+  passwordSecretKeyRef:
+    name: mariadb-credentials
+    key: app-password
+  galera:
+    enabled: true
+  maxScaleRef:
+    name: maxscale
+  storage:
+    size: 2Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 768Mi }
+  # Reparte los nodos entre los nodos del clúster, pero no bloquea si hay menos nodos que réplicas.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/instance: mariadb
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MaxScale
+metadata:
+  name: maxscale
+  namespace: tienda
+spec:
+  image: mariadb/maxscale:24.02.9
+  mariaDbRef:
+    name: mariadb
+  replicas: 2
+  services:
+    - name: rw-router
+      router: readwritesplit
+      listener:
+        port: 3306
+  monitor:
+    interval: 2s
+    # Necesario cuando hay más de una réplica de MaxScale.
+    cooperativeMonitoring: majority_of_all
+  kubernetesService:
+    type: ClusterIP
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }

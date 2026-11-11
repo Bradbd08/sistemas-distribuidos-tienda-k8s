@@ -1,0 +1,21 @@
+# El operador de MongoDB vive en "tienda" (solo vigila su propio namespace).
+# Los otros operadores están en sus namespaces, que no tienen políticas.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-operator
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb-kubernetes-operator
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # El API server llama al webhook de validación (failurePolicy: Ignore) en el puerto 1993.
+    - ports:
+        - { protocol: TCP, port: 1993 }
+  egress:
+    # API de Kubernetes.
+    - ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 6443 }

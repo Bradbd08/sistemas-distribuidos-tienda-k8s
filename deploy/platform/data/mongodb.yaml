@@ -1,0 +1,75 @@
+# MongoDB con replica set de 3 miembros (reemplaza al "mongodb" de Compose, que tenía 1 solo).
+# El operador crea el Secret "mongodb-admin-store-app" con la cadena de conexión
+# (clave connectionString.standard); la API la usa como MONGO_URI.
+# La contraseña del usuario vive en el Secret "mongodb-app-password".
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: mongodb
+  namespace: tienda
+spec:
+  members: 3
+  type: ReplicaSet
+  version: "8.0.38"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+    - name: store-app
+      db: admin
+      passwordSecretRef:
+        name: mongodb-app-password
+        key: password
+      roles:
+        - name: readWrite
+          db: store_reviews
+      scramCredentialsSecretName: mongodb-store-app-scram
+  additionalMongodConfig:
+    storage.wiredTiger.engineConfig.cacheSizeGB: 0.25
+  statefulSet:
+    spec:
+      volumeClaimTemplates:
+        - metadata:
+            name: data-volume
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
+        - metadata:
+            name: logs-volume
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 512Mi
+      template:
+        spec:
+          containers:
+            - name: mongod
+              resources:
+                requests: { cpu: 100m, memory: 400Mi }
+                limits: { memory: 700Mi }
+            - name: mongodb-agent
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 384Mi }
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app: mongodb-svc
+---
+# El operador no crea PDB: con 3 miembros, solo uno puede caer a la vez (si no, se pierde la mayoría).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mongodb
+  namespace: tienda
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: mongodb-svc

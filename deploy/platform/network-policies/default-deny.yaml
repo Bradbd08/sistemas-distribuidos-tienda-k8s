@@ -1,0 +1,31 @@
+# Todo el tráfico del namespace "tienda" queda prohibido. Lo demás son excepciones explícitas por capa
+# (app.yaml, data.yaml, operators.yaml). Reemplaza las redes edge/application/database de Compose.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: tienda
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# DNS (CoreDNS en kube-system) para todos los pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: tienda
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

@@ -1,0 +1,39 @@
+# Local environment files (keep the documented template tracked).
+.env
+.env.*
+!.env.example
+
+# Credentials, private keys, and certificates.
+secrets/
+**/secrets/
+*.secret
+*.credentials
+credentials.json
+*_credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Kubernetes y Terraform: kubeconfig, estado y claves de cifrado (contienen secretos).
+kubeconfig*
+*.kubeconfig
+config-real
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.agekey
+age.key
+
+# Local database exports and backups.
+*.sql.gz
+*.dump
+*.bak
+backups/
+**/backups/
+
+.DS_Store

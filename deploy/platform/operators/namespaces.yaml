@@ -1,0 +1,17 @@
+# Namespaces que necesitan los operadores y la aplicación.
+# "tienda" aloja la aplicación, las bases de datos y el operador de MongoDB: ese operador solo vigila
+# el namespace donde se instala (WATCH_NAMESPACE sale del propio pod).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tienda
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mariadb-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis-operator

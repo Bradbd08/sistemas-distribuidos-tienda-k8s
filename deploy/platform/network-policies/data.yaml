@@ -1,0 +1,158 @@
+# Capa de datos: cada base solo acepta a quien la necesita.
+# MariaDB: lo usa MaxScale; sus nodos Galera se hablan entre sí; el operador (otro namespace) la administra.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mariadb
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mariadb
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Entre nodos Galera: consultas (3306), replicación (4567-4568), SST (4444) y agente (5555).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mariadb
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: maxscale
+      ports:
+        - { protocol: TCP, port: 3306 }
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mariadb-operator
+      ports:
+        - { protocol: TCP, port: 3306 }
+        - { protocol: TCP, port: 5555 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mariadb
+    # El agente valida las peticiones del operador con la API de Kubernetes (TokenReview).
+    - ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 6443 }
+---
+# MaxScale: recibe de la API y del Job de inicialización; habla con MariaDB.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: maxscale
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: maxscale
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: catalog-init
+      ports:
+        - { protocol: TCP, port: 3306 }
+    # El operador usa la API REST de MaxScale (8989).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mariadb-operator
+      ports:
+        - { protocol: TCP, port: 8989 }
+        - { protocol: TCP, port: 3306 }
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: maxscale
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mariadb
+      ports:
+        - { protocol: TCP, port: 3306 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: maxscale
+---
+# MongoDB: los miembros del replica set se hablan entre sí; solo la API y el Job de inicialización entran.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb-svc
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mongodb-svc
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: catalog-init
+      ports:
+        - { protocol: TCP, port: 27017 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb-svc
+      ports:
+        - { protocol: TCP, port: 27017 }
+---
+# Redis y Sentinel: la API usa el master (6379); entre ellos hablan por 6379 y 26379; el operador los administra.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+  namespace: tienda
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [redis, redis-s] }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - { protocol: TCP, port: 6379 }
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [redis, redis-s] }
+      ports:
+        - { protocol: TCP, port: 6379 }
+        - { protocol: TCP, port: 26379 }
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redis-operator
+      ports:
+        - { protocol: TCP, port: 6379 }
+        - { protocol: TCP, port: 26379 }
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [redis, redis-s] }
+      ports:
+        - { protocol: TCP, port: 6379 }
+        - { protocol: TCP, port: 26379 }

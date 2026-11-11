@@ -1,0 +1,44 @@
+# Redis con 1 master y 2 réplicas, vigilados por 3 Sentinel (el operador cambia el master si cae).
+# La API se conecta al Service "redis-master", que siempre apunta al master actual.
+# Solo es caché del catálogo (TTL de 60 s): no guarda datos que no se puedan reconstruir.
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisReplication
+metadata:
+  name: redis
+  namespace: tienda
+spec:
+  clusterSize: 3
+  # Una caída voluntaria (drenar un nodo) a la vez.
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+  kubernetesConfig:
+    image: quay.io/opstree/redis:v7.0.15
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { memory: 192Mi }
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+  sentinel:
+    size: 3
+    image: quay.io/opstree/redis-sentinel:v7.0.15
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { memory: 96Mi }
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: redis

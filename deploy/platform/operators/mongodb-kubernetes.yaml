@@ -1,0 +1,43 @@
+# Operador de MongoDB: MongoDB Controllers for Kubernetes (MCK), el sucesor activo del
+# "MongoDB Community Kubernetes Operator" (ese repo está archivado desde 2025-11).
+# Trae el mismo recurso MongoDBCommunity (mongodbcommunity.mongodb.com/v1).
+# Se instala en "tienda" porque solo vigila el namespace donde corre.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mongodb
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://mongodb.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mongodb-kubernetes
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: mongodb-kubernetes
+  targetNamespace: tienda
+  chart:
+    spec:
+      chart: mongodb-kubernetes
+      version: 1.15.0
+      sourceRef:
+        kind: HelmRepository
+        name: mongodb
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+  values:
+    operator:
+      # Solo MongoDBCommunity: no se usan Ops Manager, búsqueda ni multi-clúster.
+      watchedResources:
+        - mongodbcommunity
+      resources:
+        requests: { cpu: 100m, memory: 200Mi }
+        limits: { cpu: "1", memory: 512Mi }

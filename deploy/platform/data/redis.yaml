@@ -8,6 +8,11 @@ metadata:
   namespace: tienda
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
+    # Flux crea este CR pero NO lo vuelve a aplicar. Motivo: Flux pone en cada objeto las etiquetas
+    # kustomize.toolkit.fluxcd.io/name y /namespace, y el operador de Redis copia las etiquetas del CR al
+    # selector (inmutable) de sus StatefulSets. Si el CR ya existía sin ellas, el operador falla al
+    # reconciliar y Redis se queda sin master. Cambios al CR: kubectl apply -f deploy/platform/data/redis.yaml
+    kustomize.toolkit.fluxcd.io/ssa: IfNotPresent
 spec:
   clusterSize: 3
   # Una caída voluntaria (drenar un nodo) a la vez.

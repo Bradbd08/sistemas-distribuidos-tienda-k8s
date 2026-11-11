@@ -1,0 +1,88 @@
+# OpenTelemetry Collector, parte 1: el GATEWAY (Deployment). Recibe OTLP de las aplicaciones y de los agentes
+# y lo reparte: trazas -> Tempo, métricas -> Mimir, logs -> Loki. Las apps le hablan en
+#   http://otel-gateway.observability:4318  (HTTP)   o   otel-gateway.observability:4317  (gRPC)
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: otel-gateway
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: otel-gateway
+  targetNamespace: observability
+  dependsOn:
+    - name: tempo
+    - name: loki
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      version: 0.178.3
+      sourceRef:
+        kind: HelmRepository
+        name: open-telemetry
+  install:
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: otel-gateway
+    mode: deployment
+    replicaCount: 1
+    image:
+      repository: otel/opentelemetry-collector-k8s
+    presets:
+      # Agrega a cada dato el pod, el namespace y el deployment de origen.
+      kubernetesAttributes:
+        enabled: true
+      # Estado del clúster (réplicas, fases de pods): requiere una sola réplica del gateway.
+      clusterMetrics:
+        enabled: true
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits: { memory: 384Mi }
+    ports:
+      # La imagen -k8s escucha en estos puertos; jaeger y zipkin no se usan.
+      jaeger-compact:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      zipkin:
+        enabled: false
+    config:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+        jaeger: null
+        zipkin: null
+        prometheus: null
+      processors:
+        batch: {}
+      exporters:
+        debug: null
+        otlp/tempo:
+          endpoint: tempo.observability:4317
+          tls:
+            insecure: true
+        otlphttp/mimir:
+          endpoint: http://mimir.observability:9009/otlp
+        otlphttp/loki:
+          endpoint: http://loki.observability:3100/otlp
+      service:
+        pipelines:
+          traces:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [otlp/tempo]
+          metrics:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [otlphttp/mimir]
+          logs:
+            receivers: [otlp]
+            processors: [memory_limiter, batch]
+            exporters: [otlphttp/loki]

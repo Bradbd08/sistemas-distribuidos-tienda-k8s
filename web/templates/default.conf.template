@@ -1,5 +1,16 @@
 # Plantilla de nginx para Kubernetes (la configuración de Docker Compose sigue en web/nginx.conf).
-# Solo se reemplaza ${API_UPSTREAM}; las variables de nginx ($host, $hostname...) quedan intactas.
+# Solo se reemplazan las variables API_* y OTEL_*; las variables de nginx ($host, $hostname...) quedan intactas.
+
+# OpenTelemetry (ngx_otel_module): nginx exporta sus trazas al Collector por gRPC.
+otel_exporter {
+    endpoint ${OTEL_EXPORTER_ENDPOINT};
+}
+otel_service_name tienda-web;
+
+# Límite para la ruta pública de trazas del navegador: evita que cualquiera llene Tempo.
+# $binary_remote_addr detrás de Traefik es la IP de Traefik, así que el límite es global (10 envíos/s en total).
+limit_req_zone $binary_remote_addr zone=otlp:1m rate=10r/s;
+
 server {
     listen 8080;
     server_name _;
@@ -10,11 +21,27 @@ server {
     sub_filter '__WEB_NODE__' '$hostname';
     sub_filter_once off;
 
-    # Sonda de Kubernetes: el proceso responde. No depende de la API.
+    # Trazas de nginx: continúa la traza que traiga el navegador (traceparent) y la pasa a la API.
+    otel_trace on;
+    otel_trace_context propagate;
+
+    # Sonda de Kubernetes: el proceso responde. No depende de la API ni genera trazas.
     location = /healthz {
+        otel_trace off;
         access_log off;
         default_type text/plain;
         return 200 "ok\n";
+    }
+
+    # El navegador envía aquí sus trazas y nginx las reenvía al Collector (HTTP).
+    location = /otlp/v1/traces {
+        otel_trace off;
+        limit_req zone=otlp burst=20 nodelay;
+        client_max_body_size 1m;
+        limit_except POST {
+            deny all;
+        }
+        proxy_pass http://${OTEL_COLLECTOR_HTTP}/v1/traces;
     }
 
     location /api/ {

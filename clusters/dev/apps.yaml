@@ -10,6 +10,8 @@ spec:
   timeout: 10m
   dependsOn:
     - name: data
+    # nginx resuelve el Collector (observability) al arrancar: sin esa capa los pods web no inician.
+    - name: observability
   sourceRef:
     kind: GitRepository
     name: flux-system

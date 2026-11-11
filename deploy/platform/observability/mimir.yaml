@@ -1,0 +1,159 @@
+# Mimir (métricas) en modo monolítico: un solo proceso con todos los componentes y almacenamiento en disco.
+# El chart mimir-distributed necesita decenas de pods y un almacén de objetos (Minio), demasiado para una
+# laptop; Mimir documenta este modo para desarrollo. Limite: sin alta disponibilidad ni almacén de objetos.
+# Las métricas entran por OTLP en http://mimir.observability:9009/otlp y se consultan (PromQL) en /prometheus.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mimir-config
+  namespace: observability
+data:
+  mimir.yaml: |
+    multitenancy_enabled: false
+
+    # El registro de actividad se escribe por defecto en el directorio actual, que es de solo lectura.
+    activity_tracker:
+      filepath: /data/metrics-activity.log
+
+    server:
+      http_listen_port: 9009
+      grpc_listen_port: 9095
+      log_level: warn
+
+    blocks_storage:
+      backend: filesystem
+      bucket_store:
+        sync_dir: /data/tsdb-sync
+      filesystem:
+        dir: /data/blocks
+      tsdb:
+        dir: /data/tsdb
+
+    compactor:
+      data_dir: /data/compactor
+      sharding_ring:
+        kvstore:
+          store: memberlist
+
+    distributor:
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: memberlist
+
+    ingester:
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: memberlist
+        replication_factor: 1
+
+    ruler_storage:
+      backend: filesystem
+      filesystem:
+        dir: /data/rules
+
+    store_gateway:
+      sharding_ring:
+        replication_factor: 1
+
+    limits:
+      # Conservar 3 días de métricas.
+      compactor_blocks_retention_period: 3d
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mimir
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: mimir
+spec:
+  selector:
+    app.kubernetes.io/name: mimir
+  ports:
+    - name: http
+      port: 9009
+      targetPort: http
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mimir
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: mimir
+spec:
+  serviceName: mimir
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mimir
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mimir
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mimir
+          image: grafana/mimir:3.2.3
+          # Mimir usa rutas relativas (./data-ruler, ./metrics-activity.log...): con el sistema de archivos de solo
+          # lectura tienen que caer en el volumen de datos.
+          workingDir: /data
+          args:
+            - -config.file=/etc/mimir/mimir.yaml
+            - -target=all
+          ports:
+            - name: http
+              containerPort: 9009
+            - name: grpc
+              containerPort: 9095
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 100m, memory: 384Mi }
+            limits: { memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mimir
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: mimir-config
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 3Gi

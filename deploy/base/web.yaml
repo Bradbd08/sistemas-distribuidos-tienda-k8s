@@ -42,6 +42,9 @@ spec:
         - name: web
           # El overlay reemplaza el nombre y la etiqueta (images: en kustomization.yaml).
           image: tienda-web
+          # Always: la etiqueta dev es mutable (scripts/build-images.sh la reemplaza) y con IfNotPresent los
+          # nodos seguirían usando la imagen anterior.
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080

@@ -1,0 +1,81 @@
+name: Terraform
+
+# `terraform plan` en cada pull request que toque infra/, y `apply` solo a mano desde main con aprobación.
+#
+# LÍMITE: el estado de Terraform vive DENTRO de los clústeres (Secret en kube-system) y Flux/GitHub piden
+# permisos de administrador del repo, así que los runners de GitHub no pueden planear ni aplicar.
+# Estos jobs solo corren si existe un runner autoalojado en la laptop A (etiquetas: self-hosted, tienda) y la
+# variable del repositorio TF_SELF_HOSTED=true, con el secreto TF_GITHUB_TOKEN (token fine-grained con
+# "Administration: read/write" solo en este repo). Sin eso se saltan; la validación de Terraform sí corre
+# siempre, en ci.yml. NO PROBADO todavía: depende de montar ese runner.
+on:
+  pull_request:
+    paths:
+      - infra/**
+      - .github/workflows/terraform.yml
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Entorno a aplicar
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: plan (dev)
+    if: github.event_name == 'pull_request' && vars.TF_SELF_HOSTED == 'true'
+    runs-on: [self-hosted, tienda]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: terraform plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.TF_GITHUB_TOKEN }}
+        run: |
+          terraform -chdir=infra/terraform/envs/dev init -input=false
+          terraform -chdir=infra/terraform/envs/dev plan -input=false -no-color | tee "$RUNNER_TEMP/plan.txt"
+
+      - name: Comentar el plan en el pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### terraform plan (dev)'; echo '```'; tail -c 60000 "$RUNNER_TEMP/plan.txt"; echo '```'; } > "$RUNNER_TEMP/comment.md"
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file "$RUNNER_TEMP/comment.md"
+
+  apply:
+    name: apply (${{ inputs.env }})
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.TF_SELF_HOSTED == 'true'
+    runs-on: [self-hosted, tienda]
+    # La aprobación manual se configura en Settings > Environments > <entorno> > Required reviewers
+    # (en repos privados necesita un plan de GitHub que lo permita).
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: terraform apply
+        env:
+          GITHUB_TOKEN: ${{ secrets.TF_GITHUB_TOKEN }}
+        run: |
+          terraform -chdir=infra/terraform/envs/${{ inputs.env }} init -input=false
+          terraform -chdir=infra/terraform/envs/${{ inputs.env }} apply -input=false -auto-approve

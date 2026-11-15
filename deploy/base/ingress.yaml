@@ -12,6 +12,54 @@ spec:
     customRequestHeaders:
       X-Presentation-LB: traefik
 ---
+# Escrituras de la API (POST, PUT, PATCH y DELETE bajo /api): piden usuario y contraseña (Secret ingress-admin-auth,
+# cifrado con SOPS) y tienen un límite de frecuencia. Las lecturas siguen abiertas y sin límite: las pruebas de
+# desempeño deben medir el sistema, no el limitador. El límite va antes de la contraseña para frenar los intentos a ciegas.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: limite-escrituras
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  rateLimit:
+    average: 20
+    burst: 40
+    period: 1s
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: auth-admin
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  basicAuth:
+    secret: ingress-admin-auth
+    realm: tienda
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tienda-escrituras
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  entryPoints:
+    - web
+  routes:
+    # La prioridad alta asegura que gane al Ingress de abajo, que acepta todo bajo "/".
+    - match: PathPrefix(`/api`) && !Method(`GET`) && !Method(`HEAD`) && !Method(`OPTIONS`)
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: presentation-lb
+        - name: limite-escrituras
+        - name: auth-admin
+      services:
+        - name: web
+          port: 80
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

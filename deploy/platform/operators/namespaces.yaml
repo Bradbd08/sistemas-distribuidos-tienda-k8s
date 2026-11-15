@@ -6,6 +6,12 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: tienda
+  labels:
+    # Pod Security Admission: baseline obligatorio; restricted solo avisa (warn y audit). Las bases de datos que crean
+    # MariaDB y Redis aún no cumplen restricted: ver docs/05-seguridad.md.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
 ---

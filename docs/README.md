@@ -9,6 +9,7 @@ sobre la tienda de 3 capas de la Parte 1 (Docker Compose). Cómo levantar el pro
 | [02-gitops-iac-cicd.md](02-gitops-iac-cicd.md) | Terraform, FluxCD, SOPS y GitHub Actions | 1, 4 y 5 |
 | [03-observabilidad.md](03-observabilidad.md) | OpenTelemetry y Grafana LGTM | 6 |
 | [04-mensajeria.md](04-mensajeria.md) | RabbitMQ, el worker, reintentos y DLQ | 3 |
+| [05-seguridad.md](05-seguridad.md) | Pod Security, autenticación y límite en el ingress, y el resto del endurecimiento | 7 |
 | [hallazgos.md](hallazgos.md) | Problemas encontrados, su causa y cómo se resolvieron | todas |
 
 Los resultados de las pruebas de desempeño irán en `docs/resultados/` (fase 8).
@@ -21,5 +22,5 @@ Los resultados de las pruebas de desempeño irán en `docs/resultados/` (fase 8)
 | 2. Terraform, Flux y GitHub Actions | 1, 4 y 5 | Hecha (lo no probado está marcado en 02-gitops-iac-cicd.md) |
 | 3. OpenTelemetry y Grafana LGTM | 6 | Hecha con alcance mínimo (pendientes en 03-observabilidad.md) |
 | 4. RabbitMQ y worker | 3 | Hecha (guía en 04-mensajeria.md) |
-| 5. Wazuh y endurecimiento | 7 | Pendiente |
+| 5. Wazuh y endurecimiento | 7 | En curso (guía en 05-seguridad.md) |
 | 6. Clúster real, pruebas y entrega | 8 | Pendiente |

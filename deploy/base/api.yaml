@@ -54,11 +54,14 @@ spec:
             - configMapRef:
                 name: api-config
           env:
+            # Usuario de solo lectura (SELECT en store). Pisa el DB_USER=store_app que viene de api-config.
+            - name: DB_USER
+              value: store_api
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mariadb-credentials
-                  key: app-password
+                  key: api-password
             # Cadena de conexión que genera el operador de MongoDB (incluye todos los miembros del replica set).
             - name: MONGO_URI
               valueFrom:

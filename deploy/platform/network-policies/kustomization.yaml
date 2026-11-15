@@ -5,3 +5,4 @@ resources:
   - app.yaml
   - data.yaml
   - operators.yaml
+  - messaging.yaml

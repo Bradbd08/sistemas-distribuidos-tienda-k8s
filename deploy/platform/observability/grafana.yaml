@@ -72,7 +72,8 @@ spec:
             isDefault: true
             jsonData:
               httpMethod: POST
-              timeInterval: 15s
+              # Las métricas OTLP se guardan cada 60 s; con 15 s, rate_interval queda en 1 min y los rate() salen vacíos.
+              timeInterval: 60s
           - name: Loki
             uid: loki
             type: loki
@@ -104,3 +105,104 @@ spec:
                 datasourceUid: mimir
               nodeGraph:
                 enabled: true
+    # Alertas SLO de la API (provisioning de archivos). Sin contactos configurados: se ven en Alerting > Alert rules.
+    alerting:
+      rules.yaml:
+        # shortcut: sin tráfico no hay datos y la regla queda en OK, así que una caída total no dispara; pasar a una regla de ausencia cuando haya pruebas sintéticas
+        apiVersion: 1
+        groups:
+          - orgId: 1
+            name: tienda-slo
+            folder: Tienda
+            interval: 1m
+            rules:
+              - uid: tienda-api-errores-5xx
+                title: "API: más de 0,5 % de errores 5xx"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: '(sum(rate(http_server_request_duration_count{job="tienda/tienda-api",http_response_status_code=~"5.."}[5m])) or vector(0)) / sum(rate(http_server_request_duration_count{job="tienda/tienda-api"}[5m]))'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0.005
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: La API de la tienda supera el 0,5 % de respuestas 5xx
+                  description: La razón de respuestas 5xx sobre el total de peticiones de la API en los últimos 5 minutos lleva más de 5 minutos por encima del 0,5 %, el límite del SLO de disponibilidad del 99,5 %.
+                labels:
+                  severity: critical
+                  service: tienda-api
+              - uid: tienda-api-latencia-p95
+                title: "API: p95 de latencia mayor a 500 ms"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{job="tienda/tienda-api"}[5m])))'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0.5
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: El p95 de latencia de la API de la tienda supera los 500 ms
+                  description: El percentil 95 de la duración de las peticiones de la API en los últimos 5 minutos lleva más de 5 minutos por encima de 0,5 segundos.
+                labels:
+                  severity: warning
+                  service: tienda-api

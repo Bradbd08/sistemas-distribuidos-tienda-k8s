@@ -17,7 +17,7 @@ Los resultados de las pruebas de desempeño irán en `docs/resultados/` (fase 8)
 |---|---|---|
 | 1. Imágenes, manifiestos y datos | 0 y 2 | Hecha |
 | 2. Terraform, Flux y GitHub Actions | 1, 4 y 5 | Hecha (lo no probado está marcado en 02-gitops-iac-cicd.md) |
-| 3. OpenTelemetry y Grafana LGTM | 6 | Pendiente |
+| 3. OpenTelemetry y Grafana LGTM | 6 | Hecha con alcance mínimo (pendientes en 03-observabilidad.md) |
 | 4. RabbitMQ y worker | 3 | Pendiente |
 | 5. Wazuh y endurecimiento | 7 | Pendiente |
 | 6. Clúster real, pruebas y entrega | 8 | Pendiente |

@@ -1,5 +1,5 @@
 # Versión fija (no "22-alpine") para que el build sea reproducible.
-FROM node:22.23.4-alpine
+FROM node:26.13.1-alpine
 
 WORKDIR /app
 

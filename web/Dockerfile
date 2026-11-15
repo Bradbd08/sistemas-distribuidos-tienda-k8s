@@ -1,5 +1,5 @@
 # Etapa 1: empaqueta el SDK de OpenTelemetry para el navegador (src/telemetry.js) en un solo archivo.
-FROM node:22.23.4-alpine AS navegador
+FROM node:26.13.1-alpine AS navegador
 WORKDIR /build
 RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

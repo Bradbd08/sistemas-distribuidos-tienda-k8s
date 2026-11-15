@@ -14,6 +14,7 @@ Cada fila es algo que falló o no era como se esperaba, con su causa real y cóm
 | 8 | Redis perdía el master cada vez que Flux aplicaba el CR | Flux agrega a cada objeto las etiquetas `kustomize.toolkit.fluxcd.io/*` y el operador de Redis las copia al `selector`, que es inmutable. Con el CR ya creado, el operador no podía actualizar el StatefulSet de Sentinel | Anotación `kustomize.toolkit.fluxcd.io/ssa: IfNotPresent` en el CR: Flux lo crea desde Git pero no lo vuelve a aplicar |
 | 9 | `cidrcontains` no existe en Terraform 1.17 | — | Se calcula con `cidrhost("<ip>/<prefijo>", 0)` y se prueba con `terraform test` |
 | 10 | El merge de un pull request a `main` fue bloqueado | Unir sin revisión humana requiere permiso del usuario | El usuario autorizó a unir mis propios PRs cuando el CI esté en verde |
+| 11 | El `otel-agent` quedó en `CrashLoopBackOff` y Flux mantuvo suspendidas `apps` y `network-policies` | Los pipelines de logs y metrics del chart usan los receivers `otlp` y `prometheus`; al ponerlos en `null` el colector falla con `references receiver "otlp" which is not configured` | No anular receivers. Se comprueba antes del PR con `helm template` y `otelcol validate` |
 
 ## Qué demostraron los incidentes
 

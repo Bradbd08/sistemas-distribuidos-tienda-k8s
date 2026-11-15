@@ -54,11 +54,7 @@ spec:
       zipkin:
         enabled: false
     config:
-      receivers:
-        otlp: null
-        jaeger: null
-        zipkin: null
-        prometheus: null
+      # No anular receivers: los pipelines de logs y metrics del chart siguen usando otlp y prometheus.
       exporters:
         debug: null
         otlp/gateway:

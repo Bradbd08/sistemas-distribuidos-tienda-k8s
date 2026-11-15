@@ -4,3 +4,4 @@ resources:
   - mariadb.yaml
   - mongodb.yaml
   - redis.yaml
+  - rabbitmq.yaml

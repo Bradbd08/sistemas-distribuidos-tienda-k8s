@@ -20,8 +20,8 @@ Se conserva la traza de la página (`X-Request-Trace`): `traefik -> web-<pod> ->
 | Carpeta | Contenido |
 |---|---|
 | `web/`, `application/` | Imágenes: `web/Dockerfile` (nginx sin root, plantilla con `API_UPSTREAM`), `application/Dockerfile` |
-| `deploy/platform/operators/` | Namespaces y los 3 operadores como `HelmRelease` de Flux |
-| `deploy/platform/data/` | MariaDB + MaxScale, MongoDB y Redis (recursos de los operadores) y PDB |
+| `deploy/platform/operators/` | Namespaces, los 3 operadores como `HelmRelease` de Flux y el RabbitMQ Cluster Operator (manifiesto de la release, copiado) |
+| `deploy/platform/data/` | MariaDB + MaxScale, MongoDB, Redis y RabbitMQ (recursos de los operadores) y PDB |
 | `deploy/base/` y `deploy/overlays/{dev,prod}/` | La tienda: Deployments, Services, HPA, PDB, Job, Ingress (Kustomize) |
 | `deploy/platform/network-policies/` | Aislamiento de red |
 
@@ -39,6 +39,9 @@ Orden de despliegue: operadores, contraseñas, datos, aplicación y, al final, l
 | MaxScale como proxy de Galera | Lo pide el plan (MaxScale o ProxySQL). Su licencia es BSL: gratis para este proyecto, no es software libre |
 | Una cuenta por servicio con todos los permisos de su base | Igual que en Compose. El mínimo privilegio se hace en la fase 7 |
 | Redis solo como caché | Los datos se reconstruyen (TTL de 60 s), así que no hace falta que persistan |
+| RabbitMQ Cluster Operator fijado en la v2.21.1 y copiado a `operators/` | No hay chart oficial. Desde la v2.22.0 el operador exige cert-manager, que aún no está instalado; se sube de versión cuando llegue (Etapa 5). Trivy no escanea ese archivo porque es de terceros |
+| Las colas se declaran desde el código, no con el Messaging Topology Operator | Ese operador también exige cert-manager |
+| RabbitMQ con 768 Mi por nodo y sin límite de CPU | El operador pide 1 CPU y 2 Gi por nodo, que la laptop no aguanta |
 
 ## Verificación (2026-11-11)
 

@@ -5,3 +5,20 @@ resources:
   - mariadb-operator.yaml
   - mongodb-kubernetes.yaml
   - redis-operator.yaml
+  - rabbitmq-cluster-operator.yaml
+patches:
+  # Sin prune: borrar el CRD o el namespace borraría todos los RabbitmqCluster y sus volúmenes.
+  - patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: rabbitmq-system
+        annotations:
+          kustomize.toolkit.fluxcd.io/prune: disabled
+  - patch: |-
+      apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      metadata:
+        name: rabbitmqclusters.rabbitmq.com
+        annotations:
+          kustomize.toolkit.fluxcd.io/prune: disabled

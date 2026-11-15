@@ -1,6 +1,7 @@
 # OpenTelemetry Collector, parte 2: el AGENTE (DaemonSet, uno por nodo). Lee los logs de los contenedores de su nodo,
-# mide el kubelet (CPU y memoria de nodos y pods) y descubre métricas Prometheus por anotación
-# (prometheus.io/scrape: "true"). Todo lo reenvía al gateway.
+# mide el kubelet (CPU y memoria de nodos y pods) y descubre métricas por anotaciones de los pods
+# (io.opentelemetry.discovery.metrics.<puerto>/enabled, scraper y config; ejemplo en data/rabbitmq.yaml).
+# Todo lo reenvía al gateway.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

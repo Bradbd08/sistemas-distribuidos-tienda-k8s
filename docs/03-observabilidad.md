@@ -7,7 +7,7 @@ navegador (SDK web) --/otlp/v1/traces--> nginx (módulo OTel) --gRPC--> OTel Col
                                             | traceparent                 ^   |--> Mimir (métricas, OTLP)
                                             v                             |   |--> Loki (logs, OTLP)
                                           API (SDK de Node) --OTLP/HTTP---+
-OTel Collector (agente, DaemonSet): logs de contenedores + kubelet + descubrimiento Prometheus --> gateway
+OTel Collector (agente, DaemonSet): logs de contenedores + kubelet + métricas descubiertas por anotaciones (RabbitMQ) --> gateway
 Grafana (http://grafana.localhost:8081): Mimir, Loki y Tempo enlazados (traza <-> logs <-> métricas)
 ```
 
@@ -65,5 +65,6 @@ navegador en un navegador real.
 - Mimir pone `job="<namespace>/<service.name>"`: la API es `job="tienda/tienda-api"`. Las métricas no llevan `_total` ni `_seconds`.
 - La API no sabe la ruta (`http_route`): no hay desglose por ruta en las métricas.
 - Las métricas OTLP se guardan cada 60 s, por eso el datasource Mimir tiene `timeInterval: 60s` (así `$__rate_interval` es de 4 min o más). Con 15 s, los `rate()` de los tableros salían vacíos.
+- El agente descubre métricas con las anotaciones `io.opentelemetry.discovery.metrics.<puerto>/{enabled,scraper,config}` en el pod, no con `prometheus.io/*`. Ejemplo en `deploy/platform/data/rabbitmq.yaml` (`scraper: prometheus`). Las métricas de RabbitMQ llegan con `job="tienda/rabbitmq"` e `instance="<ip>:15692"`.
 - Las métricas `k8s_deployment_*`, `k8s_daemonset_*`, `k8s_statefulset_*`, `k8s_hpa_*` y `k8s_job_*` llegan sin etiquetas (una sola serie): no sirven para tableros. Para nombres de nodo y pod se une con `target_info`.
 - La ruta `/otlp/v1/traces` de nginx es pública (el navegador la necesita); tiene límite de 10 envíos/s global, solo `POST` y 1 MB.

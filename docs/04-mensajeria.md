@@ -134,13 +134,17 @@ Los comandos son de este clúster (`http://localhost:8081`, namespace `tienda`).
 
 **1. Publicar una reseña y verla guardada:**
 
+Las escrituras piden la contraseña del ingress (ver [05-seguridad.md](05-seguridad.md)). Usa un SKU distinto de `ST-001` para no llenar la
+reseña que muestra la página:
+
 ```bash
-curl -s -X POST http://localhost:8081/api/products/ST-001/reviews \
+ADMIN_PASS=$(kubectl -n tienda get secret ingress-admin-auth -o jsonpath='{.data.password}' | base64 -d)
+curl -s -u "admin:$ADMIN_PASS" -X POST http://localhost:8081/api/products/ST-010/reviews \
   -H 'Content-Type: application/json' \
   -d '{"reviewer":"Prueba","rating":5,"comment":"Reseña por la cola"}'
 # {"id":"...","status":"queued",...}   (HTTP 202)
 sleep 2
-curl -s http://localhost:8081/api/products/ST-001/reviews    # la reseña aparece
+curl -s http://localhost:8081/api/products/ST-010/reviews    # la reseña aparece
 kubectl -n tienda logs deploy/worker --tail=5                # el worker la procesó
 ```
 

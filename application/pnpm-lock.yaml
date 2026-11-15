@@ -20,6 +20,9 @@ importers:
       '@opentelemetry/instrumentation':
         specifier: ^0.301.1
         version: 0.301.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/instrumentation-amqplib':
+        specifier: ^0.72.0
+        version: 0.72.0(@opentelemetry/api@1.10.0)
       '@opentelemetry/instrumentation-http':
         specifier: ^0.301.1
         version: 0.301.1(@opentelemetry/api@1.10.0)
@@ -38,6 +41,9 @@ importers:
       '@opentelemetry/sdk-node':
         specifier: ^0.301.1
         version: 0.301.1(@opentelemetry/api@1.10.0)
+      amqplib:
+        specifier: ^2.3.2
+        version: 2.3.2
       mongodb:
         specifier: ^6.17.0
         version: 6.22.0
@@ -149,6 +155,12 @@ packages:
 
   '@opentelemetry/exporter-zipkin@3.1.1':
     resolution: {integrity: sha512-Y0lKFdA3gTh0lA9W+J7AKRvcKnLFfxv4z73WHZNc/LcqwL8XhgGvu0ML/ogN1VvKXNmIB95ipXbI66D3JTKcgQ==}
+    engines: {node: '>=22.15.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.10.0
+
+  '@opentelemetry/instrumentation-amqplib@0.72.0':
+    resolution: {integrity: sha512-wGetSmCISvQnhsbG8vP1LaPTXu9DEimbdGR58E+zxVnV4DK6lcBkd6AxyA/On3es9V2aYJtvzSJhIJykW2gfWw==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@opentelemetry/api': ^1.10.0
@@ -322,6 +334,10 @@ packages:
 
   '@types/whatwg-url@11.0.5':
     resolution: {integrity: sha512-coYR071JRaHa+xoEvvYqvnIHaVqaYrLPbsufM9BF63HkwI5Lgmy2QR8Q5K/lYDYo5AK82wOvSOS0UsLTpTG7uQ==}
+
+  amqplib@2.3.2:
+    resolution: {integrity: sha512-wqu6P3V2AdCCXSsXcsF5BXM2ykxLoCh3uVG0XX07HMQrTgwNUb+GT1G1s+8R9kOQYIux2xT/xf7Bzf7/cyKMag==}
+    engines: {node: '>=18'}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -652,6 +668,15 @@ snapshots:
       '@opentelemetry/sdk-trace': 3.1.1(@opentelemetry/api@1.10.0)
       '@opentelemetry/semantic-conventions': 1.45.0
 
+  '@opentelemetry/instrumentation-amqplib@0.72.0(@opentelemetry/api@1.10.0)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/instrumentation': 0.301.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/semantic-conventions': 1.45.0
+    transitivePeerDependencies:
+      - supports-color
+
   '@opentelemetry/instrumentation-http@0.301.1(@opentelemetry/api@1.10.0)':
     dependencies:
       '@opentelemetry/api': 1.10.0
@@ -839,6 +864,8 @@ snapshots:
   '@types/whatwg-url@11.0.5':
     dependencies:
       '@types/webidl-conversions': 7.0.3
+
+  amqplib@2.3.2: {}
 
   ansi-regex@5.0.1: {}
 

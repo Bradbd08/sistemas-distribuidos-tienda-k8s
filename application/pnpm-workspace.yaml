@@ -2,3 +2,6 @@
 # protobufjs trae un script opcional que no necesitamos: se niega a propósito (así el build no falla ni ejecuta nada).
 allowBuilds:
   protobufjs: false
+# amqplib 2.3.2 corrige GHSA-gfjv-mq5g-xjfw y salió hace pocas horas: se excluye a propósito de la edad mínima de pnpm.
+minimumReleaseAgeExclude:
+  - amqplib@2.3.2

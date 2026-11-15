@@ -52,3 +52,45 @@ spec:
     - ports:
         - { protocol: TCP, port: 443 }
         - { protocol: TCP, port: 6443 }
+---
+# Worker: consume de RabbitMQ, escribe en MongoDB, repuebla la caché por la API y envía trazas. No recibe tráfico.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker
+  namespace: tienda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+      ports:
+        - { protocol: TCP, port: 5672 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb-svc
+      ports:
+        - { protocol: TCP, port: 27017 }
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+      ports:
+        - { protocol: TCP, port: 8080 }
+    # Trazas y métricas OTLP/HTTP al Collector.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+              app.kubernetes.io/instance: otel-gateway
+      ports:
+        - { protocol: TCP, port: 4318 }

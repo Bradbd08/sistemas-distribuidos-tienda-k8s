@@ -13,6 +13,9 @@ images:
   - name: tienda-api
     newName: ghcr.io/bradbd08/tienda-api # {"$imagepolicy": "flux-system:tienda-api:name"}
     newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-api:tag"}
+  - name: tienda-worker
+    newName: ghcr.io/bradbd08/tienda-worker # {"$imagepolicy": "flux-system:tienda-worker:name"}
+    newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-worker:tag"}
 patches:
   # 3 réplicas mínimas (en dev son 2).
   - target:

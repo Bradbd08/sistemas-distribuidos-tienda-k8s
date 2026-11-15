@@ -10,3 +10,6 @@ images:
   - name: tienda-api
     newName: tienda-registry:5000/tienda-api
     newTag: dev
+  - name: tienda-worker
+    newName: tienda-registry:5000/tienda-worker
+    newTag: dev

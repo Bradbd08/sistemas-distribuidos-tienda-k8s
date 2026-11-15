@@ -17,6 +17,8 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
   const { MySQL2Instrumentation } = await import("@opentelemetry/instrumentation-mysql2");
   const { MongoDBInstrumentation } = await import("@opentelemetry/instrumentation-mongodb");
   const { RedisInstrumentation } = await import("@opentelemetry/instrumentation-redis");
+  // Propaga la traza por las cabeceras de los mensajes de RabbitMQ: la reseña y el worker salen en la misma traza.
+  const { AmqplibInstrumentation } = await import("@opentelemetry/instrumentation-amqplib");
 
   const sdk = new NodeSDK({
     traceExporter: new OTLPTraceExporter(),
@@ -32,6 +34,7 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
       new MySQL2Instrumentation(),
       new MongoDBInstrumentation(),
       new RedisInstrumentation(),
+      new AmqplibInstrumentation(),
     ],
   });
   sdk.start();

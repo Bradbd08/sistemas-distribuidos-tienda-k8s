@@ -65,6 +65,13 @@ spec:
                 secretKeyRef:
                   name: mongodb-admin-store-app
                   key: connectionString.standard
+            # Opcional: sin RabbitMQ (o sin el Secret) la API guarda las reseñas directo en MongoDB.
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: connection_string
+                  optional: true
             # El nombre del pod sale en la traza de la página (antes: app1/app2/app3).
             - name: APPLICATION_NODE
               valueFrom:

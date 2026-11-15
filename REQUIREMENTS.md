@@ -143,25 +143,26 @@ Cada capa necesita la anterior: corre los pasos en este orden, desde la raíz de
 # 1) Controladores de Flux. Sin Git todavía: el repositorio de GitHub entra con Terraform y Flux.
 flux install --context k3d-tienda
 
-# 2) Operadores de MariaDB, MongoDB y Redis (son HelmRelease de Flux). Tarda ~1 minuto.
+# 2) Operadores de MariaDB, MongoDB y Redis (HelmRelease de Flux) y el de RabbitMQ (manifiesto de la release). Tarda ~1 minuto.
 kubectl apply -k deploy/platform/operators
 kubectl -n flux-system wait --for=condition=Ready helmrelease --all --timeout=540s
 
 # 3) Contraseñas de desarrollo al azar. Viven solo en el clúster (no van a git) y no cambia las que ya existen.
 bash scripts/create-dev-secrets.sh
 
-# 4) Bases de datos: MariaDB Galera + MaxScale, MongoDB (replica set de 3) y Redis + Sentinel. ~5 minutos la primera vez.
+# 4) Bases de datos y cola: MariaDB Galera + MaxScale, MongoDB (replica set de 3), Redis + Sentinel y RabbitMQ (3 nodos). ~5 minutos la primera vez.
 kubectl apply -k deploy/platform/data
 kubectl -n tienda wait --for=condition=Ready mariadb/mariadb maxscale/maxscale --timeout=900s
 kubectl -n tienda wait --for=jsonpath='{.status.phase}'=Running mongodbcommunity/mongodb --timeout=900s
+kubectl -n tienda wait --for=condition=AllReplicasReady rabbitmqcluster/rabbitmq --timeout=900s
 
-# 5) Imágenes web y API sin root, al registro del clúster (localhost:5000).
+# 5) Imágenes web, API y worker sin root, al registro del clúster (localhost:5000).
 bash scripts/build-images.sh dev
 
-# 6) La tienda: web, API, Job de inicialización, Ingress de Traefik, HPA y PDB.
+# 6) La tienda: web, API, worker, Job de inicialización, Ingress de Traefik, HPA y PDB.
 kubectl apply -k deploy/overlays/dev
 kubectl -n tienda wait --for=condition=complete job/catalog-init --timeout=240s
-kubectl -n tienda rollout status deploy/api && kubectl -n tienda rollout status deploy/web
+kubectl -n tienda rollout status deploy/api && kubectl -n tienda rollout status deploy/web && kubectl -n tienda rollout status deploy/worker
 
 # 7) Aislamiento de red (default-deny y permisos por capa). Siempre al final.
 kubectl apply -k deploy/platform/network-policies
@@ -174,12 +175,12 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/        # 200
 curl -si http://localhost:8081/api/health | grep -i x-request-trace
 # traefik -> web-... -> service/api -> api-... -> galera-lb -> mongodb -> redis
 kubectl -n tienda get pods                    # todo Running y Ready; catalog-init en Completed
-kubectl -n tienda get mariadb,maxscale,mongodbcommunity,redisreplication   # todos Ready o Running
+kubectl -n tienda get mariadb,maxscale,mongodbcommunity,redisreplication,rabbitmqcluster   # todos Ready, Running o True
 ```
 
-**Cambiar el código y redesplegar:** `bash scripts/build-images.sh dev && kubectl -n tienda rollout restart deploy/api deploy/web`.
+**Cambiar el código y redesplegar:** `bash scripts/build-images.sh dev && kubectl -n tienda rollout restart deploy/api deploy/web deploy/worker`.
 
-**Qué reemplaza a qué (Compose → Kubernetes):** HAProxy y Keepalived → Ingress de Traefik y Services; `web1-3` → Deployment `web`; `app1-3` → Deployment `api`; `galera1-3` y `galera-lb` → MariaDB Galera + MaxScale (Service `maxscale`); `mongodb` → replica set de 3 miembros; `redis` → master, 2 réplicas y 3 Sentinel (Service `redis-master`); las redes `edge`, `application` y `database` → NetworkPolicies.
+**Qué reemplaza a qué (Compose → Kubernetes):** HAProxy y Keepalived → Ingress de Traefik y Services; `web1-3` → Deployment `web`; `app1-3` → Deployment `api`; (nuevo) Deployment `worker` + RabbitMQ para las reseñas asíncronas ([`docs/04-mensajeria.md`](docs/04-mensajeria.md)); `galera1-3` y `galera-lb` → MariaDB Galera + MaxScale (Service `maxscale`); `mongodb` → replica set de 3 miembros; `redis` → master, 2 réplicas y 3 Sentinel (Service `redis-master`); las redes `edge`, `application` y `database` → NetworkPolicies.
 
 ### 5.2 GitOps: Terraform, Flux y SOPS (fases 1, 4 y 5)
 

@@ -35,11 +35,24 @@ jobs:
         with:
           node-version: 22
 
-      # Todavía no hay pruebas unitarias de la API: esto solo revisa que el código compile.
-      - name: Sintaxis de la API
+      # La API no tiene pruebas unitarias: solo se revisa que compile. El worker sí tiene (sin broker real).
+      - name: Sintaxis de la API y del worker
         run: |
           node --check application/index.js
           node --check application/init-db.js
+          node --check application/events.mjs
+          node --check application/topology.mjs
+          node --check worker/index.js
+          node --check worker/handlers.mjs
+          node --check worker/topology.mjs
+          node --check worker/telemetry.mjs
+
+      - name: Pruebas del worker
+        run: node --test worker/handlers.test.mjs
+
+      # Las colas se declaran con los mismos argumentos en la API y en el worker: las dos copias deben ser iguales.
+      - name: topology.mjs de la API y del worker son idénticos
+        run: diff -u application/topology.mjs worker/topology.mjs
 
       - name: catalog.sql y su copia para Kustomize son idénticos
         run: diff -u database/catalog.sql deploy/base/catalog-init/catalog.sql
@@ -175,6 +188,8 @@ jobs:
             context: web
           - name: tienda-api
             context: application
+          - name: tienda-worker
+            context: worker
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

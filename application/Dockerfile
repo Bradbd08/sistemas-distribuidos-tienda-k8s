@@ -15,7 +15,7 @@ RUN pnpm install --prod --frozen-lockfile
 # empaquetadas, que son las que Trivy marcaba, y reduce la superficie de ataque.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-COPY index.js init-db.js telemetry.mjs ./
+COPY index.js init-db.js telemetry.mjs events.mjs topology.mjs ./
 
 USER node
 

@@ -64,3 +64,40 @@ spec:
   resources:
     requests: { cpu: 50m, memory: 128Mi }
     limits: { memory: 256Mi }
+---
+# Mínimo privilegio: la API solo lee el catálogo (SELECT), así que usa su propio usuario de solo lectura.
+# El Job catalog-init sigue con store_app (todos los permisos sobre la base store, para crear tablas y cargar datos).
+# 60 conexiones = 6 pods de la API (máximo del HPA) x 10 del pool; el usuario store_app solo permite 20.
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: User
+metadata:
+  name: store-api
+  namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+spec:
+  mariaDbRef:
+    name: mariadb
+  name: store_api
+  passwordSecretKeyRef:
+    name: mariadb-credentials
+    key: api-password
+  maxUserConnections: 60
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Grant
+metadata:
+  name: store-api-select
+  namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+spec:
+  mariaDbRef:
+    name: mariadb
+  privileges:
+    - SELECT
+  database: store
+  table: "*"
+  username: store_api
+  host: "%"
+  grantOption: false

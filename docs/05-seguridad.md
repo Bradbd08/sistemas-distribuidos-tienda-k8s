@@ -9,7 +9,7 @@ Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mín
 | Pod Security Admission en `tienda` | Hecha: `baseline` obligatorio, `restricted` en aviso |
 | Contenedores sin root, sistema de archivos de solo lectura | Hecha en web, API y worker (cumplen `restricted`). RabbitMQ y MongoDB también |
 | Autenticación y límite de frecuencia en el ingress | Hecha para las escrituras de la API |
-| Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumple. MariaDB y Redis: pendiente |
+| Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumplía y MariaDB está hecha (la API usa un usuario de solo lectura). Redis: pendiente |
 | TLS con cert-manager | Pendiente |
 | Verificación de firmas con Kyverno | Pendiente |
 | kube-bench (CIS) | Pendiente |
@@ -59,11 +59,36 @@ El botón «Clear Redis catalog cache» de la página hace un `POST`, así que e
 
 Para cambiar la contraseña: `sops credentials/dev/ingress-admin-auth.yaml`, editar `password`, hacer el PR y esperar a Flux.
 
+## Usuarios de las bases de datos
+
+Cada servicio entra con el mínimo que necesita:
+
+| Servicio | MariaDB | MongoDB | Redis |
+|---|---|---|---|
+| API | `store_api`: solo `SELECT` en `store` | `store-app`: `readWrite` solo en `store_reviews` | sin contraseña (pendiente) |
+| Worker | no la usa | `store-app` | no lo usa |
+| Job `catalog-init` | `store_app`: todos los permisos sobre `store` (crea las tablas y carga el catálogo) | `store-app` | no lo usa |
+
+La API solo hace `SELECT` en MariaDB (catálogo, comprobar que el producto existe y las sondas), así que `store_api` no puede escribir ni cambiar
+tablas aunque alguien lograra ejecutar SQL desde la API. Lo declaran un `User` y un `Grant` del operador (`deploy/platform/data/mariadb.yaml`); la
+contraseña (`api-password`) va en el Secret `mariadb-credentials`, cifrado con SOPS. Docker Compose no cambia: sigue con `store_app`.
+
+`store_api` permite 60 conexiones (6 pods de la API, el máximo del HPA, por 10 del pool). El usuario `store_app` que crea el operador solo permite 20,
+y con más de 2 pods de la API habría errores de «demasiadas conexiones» durante las pruebas de desempeño.
+
+Comprobar los permisos (la contraseña de root se lee a una variable sin imprimirla):
+
+```bash
+ROOT=$(kubectl -n tienda get secret mariadb-credentials -o jsonpath='{.data.root-password}' | base64 -d)
+kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u root -e "SHOW GRANTS FOR store_api@'%'"
+```
+
 ## Límites conocidos
 
 | Tema | Detalle |
 |---|---|
 | Sin TLS | La contraseña viaja sin cifrar dentro de la red local hasta que llegue cert-manager |
 | Un solo usuario | Todas las escrituras comparten `admin`. No hay usuarios por persona |
+| Mongo y Redis sin usuario por servicio | La API y el worker comparten `store-app` en MongoDB; Redis no tiene contraseña |
 | `prod` sin Secret | `credentials/prod/` aún no existe (Etapa 6): sin el Secret `ingress-admin-auth` las escrituras de `prod` no pasan |
 | El límite es por IP | En k3d todas las peticiones llegan con la IP de la puerta de enlace de Docker, así que el límite es de todo el tráfico de escritura |

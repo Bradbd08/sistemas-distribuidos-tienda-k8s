@@ -15,7 +15,7 @@ cambio -> rama -> pull request -> CI (ci.yml) -> merge a main -> Flux de dev des
 | Entorno | Clúster | Rama que sigue Flux | Imágenes |
 |---|---|---|---|
 | dev | k3d `tienda` (3 servidores con etcd) | `main` | registro local `tienda-registry:5000` (etiqueta `dev`) |
-| prod | las dos laptops (K3s real) | `release`, protegida: solo entra lo aprobado por pull request | GHCR `ghcr.io/bradbd08/tienda-{web,api}` |
+| prod | las dos laptops (K3s real) | `release`, protegida: solo entra lo aprobado por pull request | GHCR `ghcr.io/bradbd08/tienda-{web,api,worker}` |
 
 ## Terraform (`infra/terraform`)
 
@@ -56,10 +56,10 @@ datos llevan `prune: disabled`. Borrar un archivo del repositorio no borra una b
 
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
-| `ci.yml` | Pull request | shellcheck, actionlint, sintaxis de la API, kubeconform en cada capa, Secrets cifrados, checkov, Trivy (config e imágenes), Terraform (fmt, validate, tflint, pruebas, checkov) |
+| `ci.yml` | Pull request | shellcheck, actionlint, sintaxis de la API y del worker, pruebas del worker, `topology.mjs` idéntico en API y worker, kubeconform en cada capa, Secrets cifrados, checkov, Trivy (config y las 3 imágenes: web, API y worker), Terraform (fmt, validate, tflint, pruebas, checkov) |
 | `release.yml` | `main` (si cambian las imágenes) y tags `vX.Y.Z` | Construye y sube a GHCR con etiqueta `sha-<commit>` (y `X.Y.Z` en tags), Trivy, firma con cosign sin llaves y adjunta el SBOM |
 | `terraform.yml` | Pull request a `infra/` | `plan` y `apply` manual, solo con runner autoalojado (ver límites) |
-| `dependabot.yml` | Semanal | Acciones, imágenes base, pnpm y providers de Terraform |
+| `dependabot.yml` | Semanal | Acciones, imágenes base (web, API y worker), pnpm (API y worker) y providers de Terraform |
 
 Todas las acciones están fijadas por SHA de commit. Los permisos son mínimos por job (`packages: write` y `id-token: write` solo en el release).
 
@@ -73,6 +73,6 @@ secretos de variables de entorno, 12-factor) y `CKV_K8S_43` (sin digest: dev usa
 | `terraform plan/apply` en CI | El estado vive dentro de los clústeres y Terraform necesita permisos de administrador del repo: los runners de GitHub no pueden. Los jobs están escritos pero solo corren con un runner autoalojado en la laptop A y `TF_SELF_HOSTED=true`. **No probado** |
 | Image automation | Escrita y validada con kubeconform, pero **no probada**: necesita el clúster real y credenciales de GHCR (los paquetes de un repo privado son privados) |
 | Aprobación manual en `terraform.yml` | Los *environments* con revisores obligatorios dependen del plan de GitHub para repos privados |
-| Pruebas unitarias | La API no tiene todavía; el CI solo revisa que compile |
+| Pruebas | La API no tiene pruebas unitarias; el CI solo revisa que compile. El worker tiene pruebas de sus manejadores (`node --test`), sin broker real: RabbitMQ no se prueba en CI |
 | Firma con cosign | Sin llaves: la identidad del workflow (repositorio y commit) queda en el registro público Rekor |
 | Clave age | Está en `~/.config/sops/age/keys.txt` de la laptop A. Si se pierde no se pueden editar los Secrets cifrados (se regeneran): hay que respaldarla |

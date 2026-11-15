@@ -4,6 +4,7 @@ namespace: tienda
 resources:
   - web.yaml
   - api.yaml
+  - worker.yaml
   - catalog-init.yaml
   - ingress.yaml
 configMapGenerator:

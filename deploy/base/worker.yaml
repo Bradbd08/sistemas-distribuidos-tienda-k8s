@@ -1,0 +1,131 @@
+# Consumidor de RabbitMQ: guarda las reseñas en MongoDB y repuebla la caché. No recibe tráfico (sin Service).
+# Mismas convenciones de seguridad y recursos que api.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: tienda
+spec:
+  # Sin HorizontalPodAutoscaler: dos réplicas fijas (la cola reparte los mensajes entre ellas).
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker
+        app.kubernetes.io/part-of: tienda
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: worker
+      containers:
+        - name: worker
+          # El overlay reemplaza el nombre y la etiqueta (images: en kustomization.yaml).
+          image: tienda-worker
+          # Always: la etiqueta dev es mutable (scripts/build-images.sh la reemplaza) y con IfNotPresent los
+          # nodos seguirían usando la imagen anterior.
+          imagePullPolicy: Always
+          # OpenTelemetry: --import carga telemetry.mjs antes que el worker (solo se activa con OTEL_EXPORTER_OTLP_ENDPOINT).
+          command: ["node", "--import", "./telemetry.mjs", "index.js"]
+          ports:
+            - name: health
+              containerPort: 8081
+          env:
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: connection_string
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-admin-store-app
+                  key: connectionString.standard
+            - name: MONGO_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: MONGO_DB
+            # Para repoblar la caché: GET /products/cheapest.
+            - name: API_URL
+              value: http://api:8080
+            - name: MAX_ATTEMPTS
+              value: "5"
+            - name: PORT
+              value: "8081"
+            # Trazas y métricas al Collector (gateway). El nombre del pod identifica la instancia en Mimir (label "instance").
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-gateway.observability:4318
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
+            - name: OTEL_SERVICE_NAME
+              value: tienda-worker
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=tienda,service.instance.id=$(K8S_POD_NAME)
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }
+          # El worker abre el puerto de sondas antes de conectar con RabbitMQ y MongoDB: la sonda de
+          # arranque evita que la de vida lo reinicie mientras tanto.
+          startupProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 3
+            failureThreshold: 60
+          # Vida: solo el proceso.
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 10
+          # Disponibilidad: conectado a RabbitMQ y a MongoDB.
+          readinessProbe:
+            httpGet: { path: /readyz, port: health }
+            periodSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: worker
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: tienda
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker

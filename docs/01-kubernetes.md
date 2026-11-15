@@ -7,6 +7,7 @@
 | HAProxy + Keepalived (`presentation-*`) | Ingress de Traefik (viene con K3s) y Services |
 | `web1-3` (nginx) | Deployment `web` (nginx sin root), HPA de 2 a 6 réplicas |
 | `application-lb-*` + `app1-3` | Service `api` + Deployment `api`, HPA de 2 a 6 réplicas |
+| (no existía) | Deployment `worker` (2 réplicas, sin Service ni HPA) y RabbitMQ de 3 nodos |
 | `galera1-3` + `galera-lb` (HAProxy) | MariaDB Galera de 3 nodos + MaxScale (Service `maxscale`) con MariaDB Operator |
 | `mongodb` (1 nodo) | MongoDB con replica set de 3 miembros (operador MCK) |
 | `redis` (1 nodo) | Redis con 1 master, 2 réplicas y 3 Sentinel (OpsTree redis-operator) |
@@ -19,7 +20,7 @@ Se conserva la traza de la página (`X-Request-Trace`): `traefik -> web-<pod> ->
 
 | Carpeta | Contenido |
 |---|---|
-| `web/`, `application/` | Imágenes: `web/Dockerfile` (nginx sin root, plantilla con `API_UPSTREAM`), `application/Dockerfile` |
+| `web/`, `application/`, `worker/` | Imágenes: `web/Dockerfile` (nginx sin root, plantilla con `API_UPSTREAM`), `application/Dockerfile` y `worker/Dockerfile` (consume las colas de RabbitMQ, ver [04-mensajeria.md](04-mensajeria.md)) |
 | `deploy/platform/operators/` | Namespaces, los 3 operadores como `HelmRelease` de Flux y el RabbitMQ Cluster Operator (manifiesto de la release, copiado) |
 | `deploy/platform/data/` | MariaDB + MaxScale, MongoDB, Redis y RabbitMQ (recursos de los operadores) y PDB |
 | `deploy/base/` y `deploy/overlays/{dev,prod}/` | La tienda: Deployments, Services, HPA, PDB, Job, Ingress (Kustomize) |

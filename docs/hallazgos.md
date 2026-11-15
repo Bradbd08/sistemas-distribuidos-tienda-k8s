@@ -15,9 +15,11 @@ Cada fila es algo que falló o no era como se esperaba, con su causa real y cóm
 | 9 | `cidrcontains` no existe en Terraform 1.17 | — | Se calcula con `cidrhost("<ip>/<prefijo>", 0)` y se prueba con `terraform test` |
 | 10 | El merge de un pull request a `main` fue bloqueado | Unir sin revisión humana requiere permiso del usuario | El usuario autorizó a unir mis propios PRs cuando el CI esté en verde |
 | 11 | El `otel-agent` quedó en `CrashLoopBackOff` y Flux mantuvo suspendidas `apps` y `network-policies` | Los pipelines de logs y metrics del chart usan los receivers `otlp` y `prometheus`; al ponerlos en `null` el colector falla con `references receiver "otlp" which is not configured` | No anular receivers. Se comprueba antes del PR con `helm template` y `otelcol validate` |
+| 12 | Los tableros de la API salían en «Sin datos» aunque Mimir tenía los datos | El datasource Mimir declaraba `timeInterval: 15s`, pero las métricas OTLP llegan cada 60 s: `$__rate_interval` quedaba en 1 min y cada `rate()` caía sobre una sola muestra. Las consultas probadas a mano con `[5m]` sí devolvían datos | `timeInterval: 60s` en el datasource. Se probó con un Grafana local y el provisioning real, contando los valores de cada panel |
 
 ## Qué demostraron los incidentes
 
 - **Los datos sobreviven a un reinicio completo** del clúster (5 a 7): las reseñas de MongoDB y el catálogo de MariaDB se conservaron.
 - Las **NetworkPolicies de denegar todo** necesitan probarse reiniciando los pods, no solo mirando que los actuales sigan listos (6).
 - Con **GitOps** hay que probar qué hace Flux sobre objetos que ya existían (8) y no suponer que adopta sin cambios.
+- Un tablero se prueba **dentro de Grafana**, no solo con PromQL a mano: `$__rate_interval` depende del datasource y una consulta que funciona con `[5m]` puede salir vacía en el panel (12).

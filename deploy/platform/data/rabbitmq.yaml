@@ -45,10 +45,19 @@ spec:
         template:
           metadata:
             annotations:
-              # El agente de OpenTelemetry descubre las métricas por estas anotaciones (otel-agent.yaml).
-              prometheus.io/scrape: "true"
-              prometheus.io/port: "15692"
-              prometheus.io/path: /metrics
+              # El agente de OpenTelemetry (otel-agent.yaml) descubre estas métricas con anotaciones
+              # io.opentelemetry.discovery.metrics.<puerto>/...; las prometheus.io/* no las lee.
+              # Solo el puerto 15692: sin el puerto en la anotación, intentaría raspar todos los puertos del pod.
+              io.opentelemetry.discovery.metrics.15692/enabled: "true"
+              io.opentelemetry.discovery.metrics.15692/scraper: prometheus
+              io.opentelemetry.discovery.metrics.15692/config: |
+                config:
+                  scrape_configs:
+                    - job_name: rabbitmq
+                      scrape_interval: 30s
+                      metrics_path: /metrics
+                      static_configs:
+                        - targets: ["`endpoint`"]
 ---
 # El operador no crea PDB: con 3 nodos solo uno puede caer a la vez (si no, las colas de quórum pierden la mayoría).
 apiVersion: policy/v1

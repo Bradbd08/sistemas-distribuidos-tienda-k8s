@@ -5,6 +5,7 @@ resources:
   - mariadb-operator.yaml
   - mongodb-kubernetes.yaml
   - redis-operator.yaml
+  - cert-manager.yaml
   - rabbitmq-cluster-operator.yaml
 patches:
   # Sin prune: borrar el CRD o el namespace borraría todos los RabbitmqCluster y sus volúmenes.

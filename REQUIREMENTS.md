@@ -2,7 +2,7 @@
 
 > **Para personas y para agentes de IA** (Antigravity, Claude Code, etc.). `AGENTS.md` apunta a este archivo.
 > Léelo completo antes de ejecutar comandos. Se actualiza conforme avanza la Parte 2.
-> Última actualización: 2026-11-11.
+> Última actualización: 2026-11-15.
 
 ## 1. Qué es este proyecto
 
@@ -143,7 +143,7 @@ Cada capa necesita la anterior: corre los pasos en este orden, desde la raíz de
 # 1) Controladores de Flux. Sin Git todavía: el repositorio de GitHub entra con Terraform y Flux.
 flux install --context k3d-tienda
 
-# 2) Operadores de MariaDB, MongoDB y Redis (HelmRelease de Flux) y el de RabbitMQ (manifiesto de la release). Tarda ~1 minuto.
+# 2) Operadores de MariaDB, MongoDB y Redis y cert-manager (HelmRelease de Flux), y el de RabbitMQ (manifiesto de la release). Tarda ~1 minuto.
 kubectl apply -k deploy/platform/operators
 kubectl -n flux-system wait --for=condition=Ready helmrelease --all --timeout=540s
 
@@ -172,6 +172,7 @@ kubectl apply -k deploy/platform/network-policies
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/        # 200
+bash scripts/verificar-ingress.sh   # lecturas por HTTP y HTTPS; las escrituras de la API solo por HTTPS y con contraseña (docs/05-seguridad.md)
 curl -si http://localhost:8081/api/health | grep -i x-request-trace
 # traefik -> web-... -> service/api -> api-... -> galera-lb -> mongodb -> redis
 kubectl -n tienda get pods                    # todo Running y Ready; catalog-init en Completed

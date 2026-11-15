@@ -36,3 +36,13 @@ metadata:
   name: observability
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
+---
+# cert-manager. Sus pods ya cumplen Pod Security restricted (se comprobó con una simulación en el servidor), así que es obligatorio.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

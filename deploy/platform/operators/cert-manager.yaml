@@ -1,0 +1,46 @@
+# cert-manager: emite y renueva los certificados TLS del ingress (Etapa 5). Los Issuer y Certificate de la tienda
+# están en deploy/base/tls.yaml. Los CRDs vienen dentro del chart (crds.enabled) y se conservan si se desinstala
+# (crds.keep, por defecto true): borrarlos borraría todos los Certificate e Issuer.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jetstack
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://charts.jetstack.io
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: cert-manager
+  targetNamespace: cert-manager
+  chart:
+    spec:
+      chart: cert-manager
+      version: v1.21.3
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+  install:
+    remediation:
+      retries: 3
+  values:
+    crds:
+      enabled: true
+    # Recursos pequeños: es un clúster de desarrollo en una laptop.
+    resources:
+      requests: { cpu: 25m, memory: 64Mi }
+      limits: { memory: 256Mi }
+    webhook:
+      resources:
+        requests: { cpu: 25m, memory: 32Mi }
+        limits: { memory: 128Mi }
+    cainjector:
+      resources:
+        requests: { cpu: 25m, memory: 64Mi }
+        limits: { memory: 256Mi }

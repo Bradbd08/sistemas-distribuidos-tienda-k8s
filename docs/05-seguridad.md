@@ -10,7 +10,7 @@ Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mín
 | Contenedores sin root, sistema de archivos de solo lectura | Hecha en web, API y worker (cumplen `restricted`). RabbitMQ y MongoDB también |
 | Autenticación y límite de frecuencia en el ingress | Hecha para las escrituras de la API |
 | Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumplía y MariaDB está hecha (la API usa un usuario de solo lectura). Redis: pendiente |
-| TLS con cert-manager | Pendiente |
+| TLS con cert-manager | Hecha: CA propia y HTTPS en el ingress. Las escrituras de la API solo entran por HTTPS |
 | Verificación de firmas con Kyverno | Pendiente |
 | kube-bench (CIS) | Pendiente |
 | Wazuh (manager, indexador, panel y agentes) | Pendiente, al final |
@@ -40,24 +40,58 @@ configurar el `securityContext` en los recursos de MariaDB, MaxScale y Redis. Es
 
 ## Autenticación y límite en el ingress
 
-Las **escrituras** de la API (`POST`, `PUT`, `PATCH` y `DELETE` bajo `/api`) pasan por una ruta de Traefik (`IngressRoute tienda-escrituras`,
-en `deploy/base/ingress.yaml`) con dos middlewares, en este orden:
+Las **escrituras** de la API (`POST`, `PUT`, `PATCH` y `DELETE` bajo `/api`) solo se aceptan por HTTPS. La ruta de Traefik
+(`IngressRoute tienda-escrituras`, en `deploy/base/ingress.yaml`) escucha en el puerto `websecure` y aplica dos middlewares, en este orden:
 
 1. `limite-escrituras`: 20 peticiones por segundo por IP, con ráfaga de 40. Va antes de la contraseña para frenar los intentos a ciegas.
 2. `auth-admin`: usuario y contraseña (`basicAuth`) del Secret `ingress-admin-auth`, cifrado con SOPS en `credentials/dev/`.
 
-Las **lecturas** (`GET`, `HEAD`, `OPTIONS`) siguen abiertas y sin límite: las pruebas de desempeño deben medir el sistema, no el limitador.
+Por HTTP, `IngressRoute tienda-escrituras-http` no procesa la escritura: responde `308` hacia HTTPS (en dev, al puerto 8443). Hacen falta las
+dos rutas porque el `Ingress` de la tienda acepta todo bajo `/` en los dos puertos y sin contraseña (hallazgo 21).
 
-Para ver la contraseña (usuario `admin`):
+Las **lecturas** (`GET`, `HEAD`, `OPTIONS`) siguen abiertas y sin límite, por HTTP y por HTTPS: las pruebas de desempeño deben medir el sistema, no el limitador.
+
+Para ver la contraseña (usuario `admin`) y usarla (`tienda-ca.crt` se exporta en la sección siguiente):
 
 ```bash
 ADMIN_PASS=$(kubectl -n tienda get secret ingress-admin-auth -o jsonpath='{.data.password}' | base64 -d)
-curl -s -u "admin:$ADMIN_PASS" -X POST http://localhost:8081/api/cache/clear
+curl -s --cacert tienda-ca.crt -u "admin:$ADMIN_PASS" -X POST https://localhost:8443/api/cache/clear
 ```
 
-El botón «Clear Redis catalog cache» de la página hace un `POST`, así que el navegador pide el usuario y la contraseña.
+El botón «Clear Redis catalog cache» de la página hace un `POST`, así que el navegador pide el usuario y la contraseña. Abre la página por
+`https://localhost:8443`: por HTTP las escrituras no se procesan.
 
 Para cambiar la contraseña: `sops credentials/dev/ingress-admin-auth.yaml`, editar `password`, hacer el PR y esperar a Flux.
+
+## TLS con cert-manager
+
+cert-manager (`HelmRelease` en `deploy/platform/operators/cert-manager.yaml`, namespace `cert-manager`) crea y renueva los certificados. Los objetos
+de la tienda están en `deploy/base/tls.yaml`, en el namespace `tienda`:
+
+| Objeto | Qué hace |
+|---|---|
+| `Issuer autofirmado` | Solo firma la CA |
+| `Certificate tienda-ca` | La CA propia (10 años). Su Secret `tienda-ca` guarda la clave y no debe salir del clúster |
+| `Issuer tienda-ca` | Firma con esa CA |
+| `Certificate tienda-tls` | El certificado de `localhost` (90 días). cert-manager lo renueva solo, 30 días antes de que venza |
+
+`tienda-escrituras` carga el Secret `tienda-tls`. Traefik elige el certificado por el nombre que pide el cliente (SNI), así que las lecturas por
+`https://localhost:8443` usan el mismo. Si el Secret faltara, Traefik solo avisa en su log y usa su certificado por defecto: la ruta con contraseña sigue.
+
+Para confiar en la CA, exporta el certificado público (la clave no se toca):
+
+```bash
+kubectl -n tienda get secret tienda-ca -o jsonpath='{.data.tls\.crt}' | base64 -d > tienda-ca.crt
+curl --cacert tienda-ca.crt https://localhost:8443/        # sin -k
+```
+
+En el navegador, importa `tienda-ca.crt` como autoridad en su gestor de certificados (sección «Autoridades»). Sin eso avisa que el sitio no es de confianza.
+
+Para comprobar la entrada completa (no escribe nada; la contraseña se lee a un archivo temporal y no se imprime):
+
+```bash
+bash scripts/verificar-ingress.sh        # lecturas por HTTP y HTTPS, escrituras redirigidas por HTTP y con contraseña por HTTPS
+```
 
 ## Usuarios de las bases de datos
 
@@ -87,8 +121,11 @@ kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u 
 
 | Tema | Detalle |
 |---|---|
-| Sin TLS | La contraseña viaja sin cifrar dentro de la red local hasta que llegue cert-manager |
+| CA propia | Ningún navegador confía en ella hasta que se importa `tienda-ca.crt` (una sola vez). Una CA pública como Let's Encrypt pide un dominio real |
+| Solo `localhost` | El certificado es para `localhost`. En `prod` (Etapa 6) hay que agregar en `deploy/base/tls.yaml` el nombre o la IP con que se entra al clúster real |
+| TLS solo en la entrada | Dentro del clúster (Traefik a la web, API a las bases, AMQP) el tráfico va sin cifrar. El mTLS entre servicios es opcional en el plan y no se hizo |
+| Grafana sin el certificado de la tienda | `grafana.localhost` sigue con el certificado por defecto de Traefik y por HTTP |
 | Un solo usuario | Todas las escrituras comparten `admin`. No hay usuarios por persona |
 | Mongo y Redis sin usuario por servicio | La API y el worker comparten `store-app` en MongoDB; Redis no tiene contraseña |
-| `prod` sin Secret | `credentials/prod/` aún no existe (Etapa 6): sin el Secret `ingress-admin-auth` las escrituras de `prod` no pasan |
+| `prod` sin Secret | `credentials/prod/` aún no existe (Etapa 6). Crear `ingress-admin-auth` **antes** de desplegar `prod`: por el código de Traefik, si falta el Secret la ruta de escrituras se descarta y caerían en el `Ingress` sin contraseña. No está probado (hallazgo 22) |
 | El límite es por IP | En k3d todas las peticiones llegan con la IP de la puerta de enlace de Docker, así que el límite es de todo el tráfico de escritura |

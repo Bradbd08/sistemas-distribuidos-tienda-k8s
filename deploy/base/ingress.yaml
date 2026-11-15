@@ -12,9 +12,10 @@ spec:
     customRequestHeaders:
       X-Presentation-LB: traefik
 ---
-# Escrituras de la API (POST, PUT, PATCH y DELETE bajo /api): piden usuario y contraseña (Secret ingress-admin-auth,
-# cifrado con SOPS) y tienen un límite de frecuencia. Las lecturas siguen abiertas y sin límite: las pruebas de
-# desempeño deben medir el sistema, no el limitador. El límite va antes de la contraseña para frenar los intentos a ciegas.
+# Escrituras de la API (POST, PUT, PATCH y DELETE bajo /api): solo por HTTPS, con usuario y contraseña (Secret
+# ingress-admin-auth, cifrado con SOPS) y con un límite de frecuencia. Las lecturas siguen abiertas, por HTTP y por HTTPS,
+# y sin límite: las pruebas de desempeño deben medir el sistema, no el limitador. El límite va antes de la contraseña
+# para frenar los intentos a ciegas.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -38,6 +39,20 @@ spec:
     secret: ingress-admin-auth
     realm: tienda
 ---
+# Redirige a HTTPS. El puerto lo pone cada overlay: sin "port" es el 443 normal; en dev es el 8443 por el mapeo de k3d.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirigir-https
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+# El Ingress de abajo acepta todo bajo "/" en los dos puertos de entrada y sin contraseña, así que las escrituras
+# necesitan una ruta en cada uno: esta (HTTPS, con contraseña y límite) y tienda-escrituras-http.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -46,9 +61,12 @@ metadata:
     app.kubernetes.io/part-of: tienda
 spec:
   entryPoints:
-    - web
+    - websecure
+  # El Secret lo crea cert-manager (tls.yaml). Si faltara, Traefik solo avisa y usa su certificado por defecto: la ruta sigue.
+  tls:
+    secretName: tienda-tls
   routes:
-    # La prioridad alta asegura que gane al Ingress de abajo, que acepta todo bajo "/".
+    # La prioridad alta asegura que gane al Ingress de abajo.
     - match: PathPrefix(`/api`) && !Method(`GET`) && !Method(`HEAD`) && !Method(`OPTIONS`)
       kind: Rule
       priority: 100
@@ -59,6 +77,27 @@ spec:
       services:
         - name: web
           port: 80
+---
+# Las mismas escrituras por HTTP no se procesan: se redirigen (308, conserva el método) a tienda-escrituras. Mantener
+# el "match" igual al de arriba. noop@internal es el servicio vacío de Traefik para rutas que solo redirigen.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tienda-escrituras-http
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api`) && !Method(`GET`) && !Method(`HEAD`) && !Method(`OPTIONS`)
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: redirigir-https
+      services:
+        - name: noop@internal
+          kind: TraefikService
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

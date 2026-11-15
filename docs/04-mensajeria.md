@@ -116,6 +116,18 @@ worker. El `x-delivery-limit` queda solo como red de seguridad para los consumid
 **Probado en el clúster (2026-11-15)** con una cola de prueba equivalente: quórum de 3 nodos. Se borró el pod líder, el liderazgo pasó a otro
 nodo y no se perdió ningún mensaje (19 = 17 + 5 publicados - 3 consumidos). Cada nodo de RabbitMQ usa unos 130 MiB reales (límite 768 Mi).
 
+## Prueba de punta a punta (2026-11-15)
+
+Con el clúster dev, la API y el worker desplegados por Flux:
+
+| Prueba | Resultado |
+|---|---|
+| Reseña por la API (`POST` con `curl`) | 202 con `status: "queued"`; aparece en el `GET` unos 2 s después |
+| La misma reseña publicada 2 veces (mismo `id`) | Queda 1 sola (clave duplicada = ya procesada) |
+| Mensaje inválido en `reviews.created` | El worker lo avisa en el log y va a `reviews.dlq` (1 mensaje) |
+| 40 reseñas por la API y se borra el pod líder de las colas a los 2 s | 40 aceptadas (202), 40 guardadas, ninguna repetida. Latencia máxima 0,32 s. El worker conectado a ese nodo se reinicia y vuelve en segundos |
+| Traza en Tempo | `tienda-web` → `tienda-api` (POST, SELECT, publish) → `tienda-worker` (`reviews.created process`, `insert product_reviews`): la traza cruza RabbitMQ por las cabeceras del mensaje |
+
 ## Cómo probarlo
 
 Los comandos son de este clúster (`http://localhost:8081`, namespace `tienda`).
@@ -223,5 +235,7 @@ El archivo lleva los hashes de las contraseñas de los usuarios: guárdalo fuera
 | Sin KEDA | Los workers son 2 réplicas fijas. No escalan por el largo de la cola |
 | Sin DLQ en las colas de catálogo | Si fallan 5 veces se descartan con un aviso. La caché expira sola a los 60 s |
 | Sin pruebas con broker real en CI | El CI revisa la sintaxis y corre las pruebas de los manejadores (`node --test worker/handlers.test.mjs`). Las colas se probaron a mano en el clúster |
-| Sin tablero ni alertas | Las métricas de RabbitMQ llegan a Mimir (ver [03-observabilidad.md](03-observabilidad.md)), pero falta el tablero de Grafana y las alertas |
+| El retraso de los consumidores se aproxima | Hay alertas por profundidad de `reviews.created`, por mensajes en `reviews.dlq` y por falta de consumidores (ver [03-observabilidad.md](03-observabilidad.md)). RabbitMQ no expone la edad del mensaje más viejo |
+| El worker se reinicia si pierde RabbitMQ | Sale y Kubernetes lo levanta en segundos. Con muchas caídas seguidas el reinicio se espacia (CrashLoopBackOff). Pasar a reconectar dentro del proceso si las pruebas de caos lo exigen |
+| Un componente nuevo con NetworkPolicies nuevas bloquea Flux la primera vez | La capa `network-policies` depende de `apps`, y `apps` espera a que el worker esté listo; sin la política, el worker no llega a MongoDB. La primera vez se aplicó a mano: `kubectl apply --server-side -k deploy/platform/network-policies`. Mejor: unir las políticas en un PR antes que el componente |
 | El 202 no garantiza que la reseña ya esté en MongoDB | Es consistencia eventual. Si algo falla, la reseña puede acabar en la DLQ |

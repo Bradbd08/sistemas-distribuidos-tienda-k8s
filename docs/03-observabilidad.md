@@ -38,25 +38,30 @@ Carpeta **Tienda** en Grafana. Los tableros son JSON en `deploy/platform/observa
 | Tienda · API (RED) | peticiones por segundo, % de errores 5xx, latencia p50/p95/p99, por código de estado y por pod, conexiones a MongoDB |
 | Tienda · Caché | % de aciertos de Redis, aciertos y fallos por segundo, % por pod |
 | Tienda · Nodos y pods | CPU, memoria y red por nodo; CPU y memoria por pod de `tienda`; contenedores no listos; reinicios en la última hora |
+| Tienda · RabbitMQ | Nodos del clúster; mensajes listos y sin confirmar por cola; consumidores; mensajes por segundo (recibidos, entregados y confirmados); envíos a la DLQ; memoria por nodo; conexiones y canales |
 
-Alertas (Alerting → Alert rules, grupo `tienda-slo`). Viven en `grafana.yaml`, llave `alerting`:
+Alertas (Alerting → Alert rules, grupos `tienda-slo` y `tienda-colas`). Viven en `grafana.yaml`, llave `alerting`:
 
 | Regla | Se activa cuando |
 |---|---|
 | API: más de 0,5 % de errores 5xx | la razón de 5xx sobre el total (ventana de 5 min) pasa de 0,5 % durante 5 min (SLO de disponibilidad de 99,5 %) |
 | API: p95 de latencia mayor a 500 ms | el p95 (ventana de 5 min) pasa de 0,5 s durante 5 min |
+| RabbitMQ: hay mensajes en `reviews.dlq` | la DLQ tiene al menos 1 mensaje listo durante 1 min |
+| RabbitMQ: más de 100 mensajes esperando en `reviews.created` | la profundidad de la cola pasa de 100 durante 5 min |
+| RabbitMQ: `reviews.created` sin consumidores | el máximo de consumidores baja de 1 durante 2 min (también si deja de llegar la métrica) |
 
 Límites conocidos: no hay punto de contacto (solo se ven en Grafana). Sin tráfico no hay datos y las reglas quedan en OK, así que una
 caída total no dispara; hace falta una regla de ausencia cuando haya pruebas sintéticas. Solo se probó el caso sano (no hay 5xx en el tráfico de prueba).
 
 ## Probado (2026-11-15)
 
-Un Grafana 12.3.1 local con el provisioning que renderiza el chart y Mimir en vivo: los 3 tableros cargan en la carpeta Tienda, las 23 consultas
-devuelven valores y las 2 reglas se evalúan sin error.
+Un Grafana 12.3.1 local con el provisioning que renderiza el chart y Mimir en vivo: los 4 tableros cargan en la carpeta Tienda, las 40 consultas
+devuelven valores y las 5 reglas se evalúan sin error. El retraso de los consumidores se aproxima con la profundidad y el número de consumidores:
+RabbitMQ no expone la edad del mensaje más viejo.
 
 ## Pendiente
 
-Tableros de Galera y RabbitMQ (llega con la Etapa 4), exportador de MariaDB, burn rate con varias ventanas, `nagios/kubernetes.cfg`
+Tablero de Galera, exportador de MariaDB, burn rate con varias ventanas, `nagios/kubernetes.cfg`
 (monitor externo), NetworkPolicies del namespace `observability` (Etapa 5), punto de contacto de las alertas, probar el SDK del
 navegador en un navegador real.
 

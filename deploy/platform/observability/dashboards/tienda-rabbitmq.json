@@ -1,0 +1,140 @@
+{
+  "uid": "tienda-rabbitmq",
+  "title": "Tienda · RabbitMQ",
+  "tags": ["tienda"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "editable": true,
+  "links": [],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Nodos de RabbitMQ",
+      "description": "Nodos distintos del clúster que reportan métricas (deduplicados por nombre de nodo; un pod reiniciado no cuenta doble). Esperado: 3.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "noValue": "0",
+        "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 2}, {"color": "green", "value": 3}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "count(count by (rabbitmq_node) (rabbitmq_identity_info)) or vector(0)", "legendFormat": "Nodos", "range": false, "instant": true}]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Mensajes en reviews.dlq",
+      "description": "Mensajes acumulados en la cola de mensajes muertos de reseñas. Cualquier valor mayor que 0 requiere revisión. Vale 0 si la cola está vacía.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "noValue": "0",
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max(rabbitmq_queue_messages{queue=\"reviews.dlq\"}) or vector(0)", "legendFormat": "reviews.dlq", "range": false, "instant": true}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Mensajes listos en reviews.created",
+      "description": "Reseñas esperando a que el worker las consuma. Vale 0 si no hay reseñas pendientes.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "noValue": "0",
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 200}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "area", "textMode": "auto", "justifyMode": "auto"},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max(rabbitmq_queue_messages_ready{queue=\"reviews.created\"}) or vector(0)", "legendFormat": "reviews.created", "range": false, "instant": true}]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Consumidores de reviews.created",
+      "description": "Workers conectados a la cola de reseñas. En rojo si no hay ninguno: las reseñas no se procesarían.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "noValue": "0",
+        "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max(rabbitmq_queue_consumers{queue=\"reviews.created\"}) or vector(0)", "legendFormat": "Consumidores", "range": false, "instant": true}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Mensajes listos por cola",
+      "description": "Mensajes listos para entregar en cada cola (máximo entre réplicas; no se suman).",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max by (queue) (rabbitmq_queue_messages_ready)", "legendFormat": "{{queue}}", "range": true, "instant": false}]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Mensajes sin confirmar por cola",
+      "description": "Mensajes entregados a un consumidor que aún no ha enviado la confirmación (ack). Máximo entre réplicas.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max by (queue) (rabbitmq_queue_messages_unacked)", "legendFormat": "{{queue}}", "range": true, "instant": false}]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Consumidores por cola",
+      "description": "Consumidores conectados a cada cola. reviews.dlq no tiene consumidores por diseño.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max by (queue) (rabbitmq_queue_consumers)", "legendFormat": "{{queue}}", "range": true, "instant": false}]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Mensajes por segundo: recibidos, entregados y confirmados",
+      "description": "Tasa global del clúster de mensajes recibidos de los productores, entregados a consumidores y confirmados (ack).",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "fieldConfig": {"defaults": {"unit": "ops", "decimals": 2, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "sum(rate(rabbitmq_global_messages_received_total[$__rate_interval]))", "legendFormat": "Recibidos", "range": true, "instant": false},
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "B", "expr": "sum(rate(rabbitmq_global_messages_delivered_total[$__rate_interval]))", "legendFormat": "Entregados", "range": true, "instant": false},
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "C", "expr": "sum(rate(rabbitmq_global_messages_acknowledged_total[$__rate_interval]))", "legendFormat": "Confirmados", "range": true, "instant": false}
+      ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Mensajes enviados a la DLQ por segundo",
+      "description": "Mensajes que pasan a la cola de mensajes muertos, por rechazo del consumidor o por superar el límite de entregas. Vale 0 si no hay ninguno.",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "fieldConfig": {"defaults": {"unit": "ops", "decimals": 3, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.001}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "sum(rate(rabbitmq_global_messages_dead_lettered_rejected_total[$__rate_interval])) or vector(0)", "legendFormat": "Rechazados por el consumidor", "range": true, "instant": false},
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "B", "expr": "sum(rate(rabbitmq_global_messages_dead_lettered_delivery_limit_total[$__rate_interval])) or vector(0)", "legendFormat": "Por límite de entregas", "range": true, "instant": false}
+      ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Memoria por nodo",
+      "description": "Memoria residente de cada nodo de RabbitMQ y, en rojo discontinuo, el límite configurado (arriba de él se activa la alarma de memoria).",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}},
+        "overrides": [{"matcher": {"id": "byName", "options": "Límite de memoria"}, "properties": [
+          {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+          {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+          {"id": "custom.fillOpacity", "value": 0}]}]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "max by (rabbitmq_node) (rabbitmq_process_resident_memory_bytes * on (instance) group_left (rabbitmq_node) max by (instance, rabbitmq_node) (rabbitmq_identity_info))", "legendFormat": "{{rabbitmq_node}}", "range": true, "instant": false},
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "B", "expr": "max(rabbitmq_resident_memory_limit_bytes)", "legendFormat": "Límite de memoria", "range": true, "instant": false}
+      ]
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "Conexiones y canales",
+      "description": "Conexiones y canales abiertos en todo el clúster (suma de nodos, deduplicando por nombre de nodo).",
+      "datasource": {"type": "prometheus", "uid": "mimir"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10, "showPoints": "never"},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "A", "expr": "sum(max by (rabbitmq_node) (rabbitmq_connections * on (instance) group_left (rabbitmq_node) max by (instance, rabbitmq_node) (rabbitmq_identity_info)))", "legendFormat": "Conexiones", "range": true, "instant": false},
+        {"datasource": {"type": "prometheus", "uid": "mimir"}, "refId": "B", "expr": "sum(max by (rabbitmq_node) (rabbitmq_channels * on (instance) group_left (rabbitmq_node) max by (instance, rabbitmq_node) (rabbitmq_identity_info)))", "legendFormat": "Canales", "range": true, "instant": false}
+      ]
+    }
+  ]
+}

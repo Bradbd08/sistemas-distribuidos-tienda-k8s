@@ -206,3 +206,144 @@ spec:
                 labels:
                   severity: warning
                   service: tienda-api
+          # shortcut: el retraso de los consumidores se aproxima con la profundidad y el número de consumidores porque RabbitMQ no expone la edad del mensaje más viejo; pasar a una alerta por edad si se mide con el worker
+          - orgId: 1
+            name: tienda-colas
+            folder: Tienda
+            interval: 1m
+            rules:
+              - uid: tienda-rabbitmq-dlq
+                title: "RabbitMQ: hay mensajes en reviews.dlq"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_messages_ready{queue="reviews.dlq"}) or vector(0)'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0
+                noDataState: OK
+                execErrState: Error
+                for: 1m
+                annotations:
+                  summary: Hay mensajes en la cola de mensajes fallidos reviews.dlq
+                  description: La cola reviews.dlq tiene al menos un mensaje listo desde hace más de 1 minuto. Son reseñas que el worker rechazó o no pudo procesar tras agotar los reintentos; hay que revisar el mensaje y los registros del worker, y reprocesarlo o descartarlo.
+                labels:
+                  severity: warning
+                  service: rabbitmq
+              - uid: tienda-rabbitmq-profundidad
+                title: "RabbitMQ: más de 100 mensajes esperando en reviews.created"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_messages_ready{queue="reviews.created"}) or vector(0)'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 100
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: La cola reviews.created acumula más de 100 mensajes listos
+                  description: La cola reviews.created lleva más de 5 minutos con más de 100 mensajes esperando a ser consumidos. El worker no da abasto o se detuvo; hay que revisar su estado y la tasa de consumo.
+                labels:
+                  severity: warning
+                  service: rabbitmq
+              - uid: tienda-rabbitmq-sin-consumidores
+                title: "RabbitMQ: reviews.created sin consumidores"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_consumers{queue="reviews.created"})'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: lt
+                            params:
+                              - 1
+                noDataState: Alerting
+                execErrState: Error
+                for: 2m
+                annotations:
+                  summary: Nadie está consumiendo la cola reviews.created
+                  description: La cola reviews.created lleva más de 2 minutos sin consumidores, o sin que RabbitMQ publique la métrica. Las reseñas nuevas se acumulan sin procesarse; hay que revisar que el worker esté en marcha y conectado.
+                labels:
+                  severity: critical
+                  service: rabbitmq

@@ -62,6 +62,8 @@ const start = async () => {
 
   const conexion = await conReintentos("RabbitMQ", () => amqp.connect(requerida("RABBITMQ_URL")));
   // Si se pierde RabbitMQ el pod sale y Kubernetes lo reinicia; los mensajes sin confirmar vuelven a la cola.
+  // shortcut: con caídas seguidas el reinicio se espacia (CrashLoopBackOff); pasar a reconectar dentro del proceso
+  // (amqplib tiene la opción recovery) si las pruebas de caos lo exigen.
   const caida = (que) => () => {
     if (cerrando) return;
     console.error(`${que} con RabbitMQ; el pod se reinicia para reconectar.`);

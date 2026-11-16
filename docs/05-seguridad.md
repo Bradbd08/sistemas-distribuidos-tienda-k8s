@@ -134,11 +134,11 @@ kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u 
 | Clave de la CA | Vive en el Secret `tienda-ca`. La pueden leer los pods con permiso de leer Secrets (MongoDB, Traefik, Grafana, Loki, los operadores y Flux). Por eso la CA solo puede firmar nombres locales |
 | Solo `localhost` | El certificado y la CA son para `localhost`. En `prod` (Etapa 6): entrar por un nombre, ponerlo en `dnsNames` de `deploy/base/tls.yaml` y ampliar `permitted` de la CA. Por IP el cliente no manda SNI y Traefik usa su certificado por defecto (haría falta un `TLSStore`) |
 | La redirección 308 | Evita que la escritura se procese por HTTP, pero no recupera una contraseña que el cliente ya mandó en esa petición. Escribe siempre `https://` |
-| cert-manager en Kubernetes 1.37 | cert-manager 1.21 declara soporte para Kubernetes 1.33 a 1.36 y este clúster es 1.37 (K3s). Está fuera de su tabla oficial |
+| cert-manager en Kubernetes 1.37 | cert-manager 1.21 declara soporte para Kubernetes 1.33 a 1.36 y este clúster es 1.37 (K3s). Está fuera de su tabla oficial. Se instaló el 2026-11-15 y funciona: `HelmRelease` listo, certificados emitidos y servidos; la renovación aún no se ha visto |
 | Webhook de cert-manager | Los `Issuer` y `Certificate` van en la capa `apps`. Si el webhook de cert-manager (1 réplica) no responde, `apps` no aplica cambios hasta que vuelva (Flux reintenta cada 2 minutos) |
 | TLS solo en la entrada | Dentro del clúster (Traefik a la web, API a las bases, AMQP) el tráfico va sin cifrar. El mTLS entre servicios es opcional en el plan y no se hizo |
 | Grafana sin el certificado de la tienda | `grafana.localhost` sigue con el certificado por defecto de Traefik y por HTTP |
 | Un solo usuario | Todas las escrituras comparten `admin`. No hay usuarios por persona |
 | Mongo y Redis sin usuario por servicio | La API y el worker comparten `store-app` en MongoDB; Redis no tiene contraseña |
 | `prod` sin Secret | `credentials/prod/` aún no existe (Etapa 6). Crear `ingress-admin-auth` **antes** de desplegar `prod`: por el código de Traefik, si falta el Secret la ruta de escrituras se descarta y caerían en el `Ingress` sin contraseña. No está probado (hallazgo 22) |
-| El límite es por IP | En k3d todas las peticiones llegan con la IP de la puerta de enlace de Docker, así que el límite es de todo el tráfico de escritura |
+| El límite es por IP de origen | Traefik cuenta por IP de origen. En k3d las peticiones entran por los 3 nodos y, por lo medido, Traefik las ve con 3 IP distintas: el límite efectivo es unas 3 veces el configurado (300 `POST` en 0,45 s: pasaron 144, y con 20 por segundo y ráfaga de 40 se esperaban unas 49). No se comprobó la IP de origen (hallazgo 26) |

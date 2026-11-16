@@ -20,8 +20,35 @@ spec:
   passwordSecretKeyRef:
     name: mariadb-credentials
     key: app-password
+  # Pod Security restricted (Etapa 5). El operador ya usa un usuario sin root (999); falta quitar la escalada de privilegios y las
+  # capacidades, y usar el perfil seccomp por defecto. Se repiten los números del usuario porque este bloque reemplaza al del operador.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   galera:
     enabled: true
+    # Los otros dos contenedores del pod (el de arranque y el agente de Galera) llevan lo mismo: el operador no les pasa
+    # spec.securityContext. El CRD pide "image" en initContainer (el webhook la completa, pero kubeconform no lo sabe):
+    # debe ser la misma versión que el operador (deploy/platform/operators/mariadb-operator.yaml). Al subir uno, subir el otro.
+    initContainer:
+      image: ghcr.io/mariadb-operator/mariadb-operator:26.10.2
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+    agent:
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
   maxScaleRef:
     name: maxscale
   storage:
@@ -61,6 +88,18 @@ spec:
     cooperativeMonitoring: majority_of_all
   kubernetesService:
     type: ClusterIP
+  # Pod Security restricted (Etapa 5): los números del usuario son los que ya pone el operador (997:995).
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 997
+    runAsGroup: 995
+    fsGroup: 995
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   resources:
     requests: { cpu: 50m, memory: 128Mi }
     limits: { memory: 256Mi }

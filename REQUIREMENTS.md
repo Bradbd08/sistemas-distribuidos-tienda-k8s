@@ -361,7 +361,7 @@ Cómo llegan las imágenes a la laptop B (GHCR o registro local), cómo se despl
 - **Redis:** la imagen que usa el operador es `redis:v7.0.15`, antigua. Trivy puede marcarla en CI; si pasa, se actualiza la etiqueta en `deploy/platform/data/redis.yaml`.
 - **Flux en dev** está instalado sin Git: los manifiestos se aplican a mano con `kubectl apply -k` (sección 5.1). El repositorio y `flux bootstrap` llegan con Terraform.
 - **`deploy/overlays/prod`** tiene `OWNER/REPO` y `PENDIENTE` como marcadores hasta que exista el repositorio de GitHub; no se despliega todavía.
-- Las contraseñas de la base de datos son una por servicio con todos los permisos de su base, igual que en Compose. El mínimo privilegio, Redis con clave y Pod Security `restricted` llegan con el endurecimiento (fase 7).
+- En el flujo manual (5.1) las contraseñas de la base de datos son una por servicio con todos los permisos de su base, igual que en Compose. Con Flux (5.2) la API usa un usuario de solo lectura en MariaDB y `tienda` exige Pod Security `restricted` (docs/05-seguridad.md). Redis con clave llega con el endurecimiento (fase 7).
 
 ## 8. Lista de verificación para la entrega (30/11/2026)
 

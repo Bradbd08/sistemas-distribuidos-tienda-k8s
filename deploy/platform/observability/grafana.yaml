@@ -40,6 +40,10 @@ spec:
     ingress:
       enabled: true
       ingressClassName: traefik
+      annotations:
+        # Más alta que la de las rutas de escrituras de la tienda (100, sin host): sin esto, los POST de Grafana
+        # (por ejemplo /api/ds/query) pedían la contraseña de la tienda (hallazgo 25).
+        traefik.ingress.kubernetes.io/router.priority: "200"
       hosts:
         - grafana.localhost
       path: /

@@ -2,7 +2,7 @@
 
 > **Para personas y para agentes de IA** (Antigravity, Claude Code, etc.). `AGENTS.md` apunta a este archivo.
 > Léelo completo antes de ejecutar comandos. Se actualiza conforme avanza la Parte 2.
-> Última actualización: 2026-11-11.
+> Última actualización: 2026-11-15.
 
 ## 1. Qué es este proyecto
 
@@ -143,7 +143,7 @@ Cada capa necesita la anterior: corre los pasos en este orden, desde la raíz de
 # 1) Controladores de Flux. Sin Git todavía: el repositorio de GitHub entra con Terraform y Flux.
 flux install --context k3d-tienda
 
-# 2) Operadores de MariaDB, MongoDB y Redis (HelmRelease de Flux) y el de RabbitMQ (manifiesto de la release). Tarda ~1 minuto.
+# 2) Operadores de MariaDB, MongoDB y Redis y cert-manager (HelmRelease de Flux), y el de RabbitMQ (manifiesto de la release). Tarda ~1 minuto.
 kubectl apply -k deploy/platform/operators
 kubectl -n flux-system wait --for=condition=Ready helmrelease --all --timeout=540s
 
@@ -178,6 +178,9 @@ kubectl -n tienda get pods                    # todo Running y Ready; catalog-in
 kubectl -n tienda get mariadb,maxscale,mongodbcommunity,redisreplication,rabbitmqcluster   # todos Ready, Running o True
 ```
 
+**Ojo:** este flujo manual no crea el Secret `ingress-admin-auth` (solo Flux lo trae, cifrado con SOPS). Sin él las escrituras de la API pueden quedar sin contraseña
+(hallazgo 22): para desarrollo usa la sección 5.2.
+
 **Cambiar el código y redesplegar:** `bash scripts/build-images.sh dev && kubectl -n tienda rollout restart deploy/api deploy/web deploy/worker`.
 
 **Qué reemplaza a qué (Compose → Kubernetes):** HAProxy y Keepalived → Ingress de Traefik y Services; `web1-3` → Deployment `web`; `app1-3` → Deployment `api`; (nuevo) Deployment `worker` + RabbitMQ para las reseñas asíncronas ([`docs/04-mensajeria.md`](docs/04-mensajeria.md)); `galera1-3` y `galera-lb` → MariaDB Galera + MaxScale (Service `maxscale`); `mongodb` → replica set de 3 miembros; `redis` → master, 2 réplicas y 3 Sentinel (Service `redis-master`); las redes `edge`, `application` y `database` → NetworkPolicies.
@@ -209,6 +212,7 @@ GITHUB_TOKEN="$(gh auth token)" terraform -chdir=infra/terraform/envs/dev apply
 ```bash
 flux get kustomizations      # operators, secrets, data, apps y network-policies en True (notifications suspendida)
 kubectl -n tienda get pods   # todo Ready
+bash scripts/verificar-ingress.sh   # lecturas por HTTP y HTTPS; toda escritura solo por HTTPS y con contraseña (docs/05-seguridad.md)
 ```
 
 **Secretos con SOPS** (`SOPS_AGE_KEY_FILE` apunta a la clave privada):

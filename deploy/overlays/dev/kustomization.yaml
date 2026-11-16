@@ -13,3 +13,12 @@ images:
   - name: tienda-worker
     newName: tienda-registry:5000/tienda-worker
     newTag: dev
+patches:
+  # k3d publica el 443 del clúster en el 8443 del host (--port 8443:443): la redirección debe apuntar ahí.
+  - target:
+      kind: Middleware
+      name: redirigir-https
+    patch: |-
+      - op: add
+        path: /spec/redirectScheme/port
+        value: "8443"

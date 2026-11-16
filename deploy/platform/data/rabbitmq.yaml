@@ -2,7 +2,7 @@
 # El operador crea el Secret rabbitmq-default-user (usuario, contraseña y connection_string) y el Service rabbitmq
 # (AMQP 5672, administración 15672 y métricas de Prometheus 15692). La administración solo se alcanza dentro del
 # clúster: kubectl -n tienda port-forward svc/rabbitmq 15672
-# Las colas no se declaran aquí (el Messaging Topology Operator exige cert-manager): las declara el código del API y del worker.
+# Las colas no se declaran aquí: las declara el código del API y del worker (el Messaging Topology Operator exige cert-manager; ya funcionan así y no se migran).
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:

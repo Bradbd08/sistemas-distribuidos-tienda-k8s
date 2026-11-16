@@ -130,16 +130,16 @@ Con el clúster dev, la API y el worker desplegados por Flux:
 
 ## Cómo probarlo
 
-Los comandos son de este clúster (`http://localhost:8081`, namespace `tienda`).
+Los comandos son de este clúster (`https://localhost:8443` para escribir, `http://localhost:8081` para leer, namespace `tienda`).
 
 **1. Publicar una reseña y verla guardada:**
 
-Las escrituras piden la contraseña del ingress (ver [05-seguridad.md](05-seguridad.md)). Usa un SKU distinto de `ST-001` para no llenar la
-reseña que muestra la página:
+Las escrituras van por HTTPS y piden la contraseña del ingress (ver [05-seguridad.md](05-seguridad.md), que explica cómo exportar `tienda-ca.crt`).
+Usa un SKU distinto de `ST-001` para no llenar la reseña que muestra la página:
 
 ```bash
 ADMIN_PASS=$(kubectl -n tienda get secret ingress-admin-auth -o jsonpath='{.data.password}' | base64 -d)
-curl -s -u "admin:$ADMIN_PASS" -X POST http://localhost:8081/api/products/ST-010/reviews \
+curl -s --cacert tienda-ca.crt -u "admin:$ADMIN_PASS" -X POST https://localhost:8443/api/products/ST-010/reviews \
   -H 'Content-Type: application/json' \
   -d '{"reviewer":"Prueba","rating":5,"comment":"Reseña por la cola"}'
 # {"id":"...","status":"queued",...}   (HTTP 202)
@@ -233,7 +233,7 @@ El archivo lleva los hashes de las contraseñas de los usuarios: guárdalo fuera
 
 | Tema | Detalle |
 |---|---|
-| Operador en la v2.21.1 | Desde la v2.22.0 el operador exige cert-manager, que el clúster no tiene. Se sube cuando llegue (Etapa 5) |
+| Operador en la v2.21.1 | Desde la v2.22.0 el operador exige cert-manager. El clúster ya lo tiene (Etapa 5), pero no se sube: no hace falta y cambiaría una mensajería ya probada |
 | Sin TLS | El AMQP y la administración van sin cifrar dentro del clúster |
 | Sin usuarios por servicio | La API y el worker usan el usuario por defecto `rabbitmq-default-user`. El mínimo privilegio queda para la fase 7 |
 | Sin KEDA | Los workers son 2 réplicas fijas. No escalan por el largo de la cola |

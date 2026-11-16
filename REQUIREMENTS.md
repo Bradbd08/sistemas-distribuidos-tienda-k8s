@@ -172,12 +172,14 @@ kubectl apply -k deploy/platform/network-policies
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/        # 200
-bash scripts/verificar-ingress.sh   # lecturas por HTTP y HTTPS; las escrituras de la API solo por HTTPS y con contraseña (docs/05-seguridad.md)
 curl -si http://localhost:8081/api/health | grep -i x-request-trace
 # traefik -> web-... -> service/api -> api-... -> galera-lb -> mongodb -> redis
 kubectl -n tienda get pods                    # todo Running y Ready; catalog-init en Completed
 kubectl -n tienda get mariadb,maxscale,mongodbcommunity,redisreplication,rabbitmqcluster   # todos Ready, Running o True
 ```
+
+**Ojo:** este flujo manual no crea el Secret `ingress-admin-auth` (solo Flux lo trae, cifrado con SOPS). Sin él las escrituras de la API pueden quedar sin contraseña
+(hallazgo 22): para desarrollo usa la sección 5.2.
 
 **Cambiar el código y redesplegar:** `bash scripts/build-images.sh dev && kubectl -n tienda rollout restart deploy/api deploy/web deploy/worker`.
 
@@ -210,6 +212,7 @@ GITHUB_TOKEN="$(gh auth token)" terraform -chdir=infra/terraform/envs/dev apply
 ```bash
 flux get kustomizations      # operators, secrets, data, apps y network-policies en True (notifications suspendida)
 kubectl -n tienda get pods   # todo Ready
+bash scripts/verificar-ingress.sh   # lecturas por HTTP y HTTPS; toda escritura solo por HTTPS y con contraseña (docs/05-seguridad.md)
 ```
 
 **Secretos con SOPS** (`SOPS_AGE_KEY_FILE` apunta a la clave privada):

@@ -2,8 +2,8 @@
 #   https://github.com/rabbitmq/cluster-operator/releases/download/v2.21.1/cluster-operator.yml
 #   sha256 del original: d859369dc044d765f316fe50dbc45368ef99a99bc4d1268ae6187d7a98b319bd
 #   Comprobar: tail -n +7 deploy/platform/operators/rabbitmq-cluster-operator.yaml | sha256sum
-# shortcut: se fija la v2.21.1 porque desde la v2.22.0 el operador exige cert-manager, que aún no está instalado;
-# subir de versión cuando llegue cert-manager (Etapa 5), revisando antes el diff de la CRD.
+# shortcut: se queda en la v2.21.1 aunque cert-manager ya está (Etapa 5): subir no aporta nada y arriesga la mensajería ya
+# probada. Subir solo si hace falta algo nuevo, revisando antes el diff de la CRD.
 apiVersion: v1
 kind: Namespace
 metadata:

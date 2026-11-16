@@ -21,10 +21,21 @@ spec:
   isCA: true
   commonName: tienda-ca
   secretName: tienda-ca
-  duration: 87600h # 10 años: la CA se importa una sola vez en el navegador
+  duration: 87600h # 10 años. Se importa una vez por clúster: si se recrea el clúster o se borra el Secret, sale una CA nueva
   privateKey:
     algorithm: ECDSA
     size: 256
+    rotationPolicy: Never # al renovarse conserva la clave, y lo que ya confía en la CA sigue confiando
+  # Esta CA solo puede firmar nombres locales: si su clave se filtrara, no serviría para suplantar otros sitios en un
+  # navegador que la haya importado. shortcut: en prod (Etapa 6) ampliar "permitted" junto con dnsNames de tienda-tls.
+  nameConstraints:
+    critical: true
+    permitted:
+      dnsDomains:
+        - localhost
+      ipRanges:
+        - 127.0.0.0/8
+        - ::1/128
   issuerRef:
     name: autofirmado
     kind: Issuer
@@ -48,9 +59,15 @@ metadata:
     app.kubernetes.io/part-of: tienda
 spec:
   secretName: tienda-tls
-  # shortcut: solo localhost (k3d). En prod (Etapa 6) agregar el nombre o la IP con que se entra al clúster real.
+  # shortcut: solo localhost (k3d). En prod (Etapa 6): entrar por un nombre (por ejemplo el de Tailscale o una línea en
+  # /etc/hosts) y ponerlo aquí. Por IP el cliente no manda SNI y Traefik usa su certificado por defecto (haría falta un TLSStore).
   dnsNames:
     - localhost
+  # Sin "usages", cert-manager no agrega server auth y macOS marca el certificado como no confiable.
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
   issuerRef:
     name: tienda-ca
     kind: Issuer

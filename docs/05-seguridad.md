@@ -6,8 +6,8 @@ Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mín
 
 | Medida (fase 7) | Estado |
 |---|---|
-| Pod Security Admission en `tienda` | Hecha: `baseline` obligatorio, `restricted` en aviso |
-| Contenedores sin root, sistema de archivos de solo lectura | Hecha en web, API y worker (cumplen `restricted`). RabbitMQ y MongoDB también |
+| Pod Security Admission en `tienda` | Hecha: `restricted` obligatorio (las bases también cumplen) |
+| Contenedores sin root, sistema de archivos de solo lectura | Sin root ni escalada de privilegios en todo `tienda`. Solo lectura en web, API, worker, RabbitMQ y MongoDB; no en MariaDB, MaxScale ni Redis (no se probó) |
 | Autenticación y límite de frecuencia en el ingress | Hecha: toda escritura (método distinto de `GET`, `HEAD` y `OPTIONS`) pide HTTPS, contraseña y límite |
 | Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumplía y MariaDB está hecha (la API usa un usuario de solo lectura). Redis: pendiente |
 | TLS con cert-manager | Hecha: CA propia y HTTPS en el ingress. Las escrituras de la API solo entran por HTTPS |
@@ -17,24 +17,27 @@ Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mín
 
 ## Pod Security Admission
 
-El namespace `tienda` lleva estas etiquetas (`deploy/platform/operators/namespaces.yaml`):
+El namespace `tienda` exige el nivel `restricted` (`deploy/platform/operators/namespaces.yaml`): la etiqueta `pod-security.kubernetes.io/enforce: restricted`
+rechaza pods con escalada de privilegios, capacidades extra, sin perfil `seccomp` o que puedan correr como root. Antes era `baseline` con `restricted` en aviso.
 
-| Etiqueta | Nivel | Qué hace |
+Antes del cambio incumplían 11 pods que crean los operadores de las bases de datos (se vio con una simulación en el servidor:
+`kubectl label --dry-run=server --overwrite ns tienda pod-security.kubernetes.io/enforce=restricted`). Se arregló con el `securityContext` de sus recursos
+en `deploy/platform/data/`:
+
+| Pods | Qué incumplían | Qué se puso |
 |---|---|---|
-| `pod-security.kubernetes.io/enforce` | `baseline` | Rechaza pods privilegiados, con `hostPath`, etc. |
-| `pod-security.kubernetes.io/warn` | `restricted` | Avisa al crear un pod que no cumple |
-| `pod-security.kubernetes.io/audit` | `restricted` | Lo anota en el log de auditoría |
+| `mariadb-0..2` | `allowPrivilegeEscalation`, capacidades y perfil `seccomp` | `podSecurityContext` y `securityContext` en `MariaDB`, y `securityContext` en los contenedores de arranque (`galera.initContainer`) y del agente (`galera.agent`) |
+| `maxscale-0..1` | lo mismo | `podSecurityContext` y `securityContext` en `MaxScale` |
+| `redis-0..2` y `redis-s-0..2` (Sentinel) | lo mismo, y además `runAsNonRoot` | `podSecurityContext` y `securityContext` en `RedisReplication` y en su `sentinel` |
 
-Se probó antes con una simulación en el servidor (`kubectl label --dry-run=server --overwrite ns tienda pod-security.kubernetes.io/enforce=restricted`).
-Con `restricted` obligatorio fallarían 11 pods que crean los operadores de las bases de datos:
+El operador de MariaDB no pasa `spec.securityContext` a los contenedores de arranque ni del agente (cada uno lleva el suyo), y su CRD pide
+`galera.initContainer.image` (el webhook la completa, pero kubeconform no lo sabe): esa imagen es la del operador, así que al subir la versión del operador
+hay que subirla también (hallazgo 27). Flux aplica los cambios de MariaDB y MaxScale; los de Redis se aplican con
+`kubectl apply -f deploy/platform/data/redis.yaml` (por `ssa: IfNotPresent`).
 
-| Pods | Qué incumplen |
-|---|---|
-| `mariadb-0..2` y `maxscale-0..1` | `allowPrivilegeEscalation`, capacidades y perfil `seccomp` |
-| `redis-0..2` y `redis-s-0..2` (Sentinel) | lo mismo, y además corren como root |
-
-Los pods de la API, la web, el worker, RabbitMQ y MongoDB ya cumplen `restricted`. Para pasar `tienda` a `restricted` obligatorio hay que
-configurar el `securityContext` en los recursos de MariaDB, MaxScale y Redis. Eso reinicia las bases de datos, así que se deja para el final.
+Costo medido al aplicarlo, con un vigilante de `/api/health` cada 2 s: el reinicio en orden de MariaDB y MaxScale dejó la API sin servicio unos 100 s
+(25 lecturas fallidas, hallazgo 28) y el de Redis unos 10 s (2 lecturas fallidas). Los datos se conservaron: Galera quedó con 3 nodos sincronizados y
+Redis con un master y 2 réplicas conectadas.
 
 `observability` no lleva etiquetas: el agente de OpenTelemetry usa `hostPath` para leer los logs de los contenedores (incumple hasta `baseline`).
 

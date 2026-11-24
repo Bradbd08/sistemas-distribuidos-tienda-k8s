@@ -12,8 +12,8 @@ importers:
         specifier: ^1.10.0
         version: 1.10.0
       '@opentelemetry/exporter-metrics-otlp-http':
-        specifier: ^0.301.1
-        version: 0.301.1(@opentelemetry/api@1.10.0)
+        specifier: ^0.301.2
+        version: 0.301.2(@opentelemetry/api@1.10.0)
       '@opentelemetry/exporter-trace-otlp-http':
         specifier: ^0.301.1
         version: 0.301.1(@opentelemetry/api@1.10.0)
@@ -123,6 +123,12 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.10.0
 
+  '@opentelemetry/exporter-metrics-otlp-http@0.301.2':
+    resolution: {integrity: sha512-DfnOIyttIFfw+P699WIUyinro4nZUvyYUulIvi/jYmOqNiMmj7FDTbSb0pKQqBvQmN2eXekLhMB11fMqc1RSNw==}
+    engines: {node: '>=22.15.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.10.0
+
   '@opentelemetry/exporter-metrics-otlp-proto@0.301.1':
     resolution: {integrity: sha512-33li14GjVjlH/zr2ThJzYNZo85RYYQ+Hq+YfuKrRGTe83kEYPTgyHskXS9rA9oE2CsYYiPgHZThjrRZrRyAr/Q==}
     engines: {node: '>=22.15.0'}
@@ -201,6 +207,12 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.10.0
 
+  '@opentelemetry/otlp-exporter-base@0.301.2':
+    resolution: {integrity: sha512-XlC8Mqeqk5vY9/jXU2No4tAPDO4g7d3QqgxznctJrM1wzF/xKUiBvQwlQguGL98nEBweq2NCkXMGj4QIGSpplg==}
+    engines: {node: '>=22.15.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.10.0
+
   '@opentelemetry/otlp-grpc-exporter-base@0.301.1':
     resolution: {integrity: sha512-hJt1tAXT8b2wY1PC3/osbnLd/nST4o1dU4GzKgB1MrIcjNYOm42+QGpgnZB3h/5dW4UBfzPNBIKORUSIkEafJw==}
     engines: {node: '>=22.15.0'}
@@ -209,6 +221,12 @@ packages:
 
   '@opentelemetry/otlp-transformer@0.301.1':
     resolution: {integrity: sha512-3oNEm6He+NfE0LCbDjq0byKLhC4WcQ1fUrIF5Cvh/D4OHs0YkTqf06OOsPg5DnqqhxB6iJTIP5ZqdLerOFDp9g==}
+    engines: {node: '>=22.15.0'}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.10.0 <1.11.0'
+
+  '@opentelemetry/otlp-transformer@0.301.2':
+    resolution: {integrity: sha512-Ap4MhVvrta1YAXoLKLdX9KuEy8zfupMRaDmbOFm0afxPqe56dAo2cCe52TDN6t175E6i4hnrBMzDXpnDR843eg==}
     engines: {node: '>=22.15.0'}
     peerDependencies:
       '@opentelemetry/api': '>=1.10.0 <1.11.0'
@@ -624,6 +642,14 @@ snapshots:
       '@opentelemetry/otlp-transformer': 0.301.1(@opentelemetry/api@1.10.0)
       '@opentelemetry/sdk-metrics': 3.1.1(@opentelemetry/api@1.10.0)
 
+  '@opentelemetry/exporter-metrics-otlp-http@0.301.2(@opentelemetry/api@1.10.0)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/otlp-exporter-base': 0.301.2(@opentelemetry/api@1.10.0)
+      '@opentelemetry/otlp-transformer': 0.301.2(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-metrics': 3.1.1(@opentelemetry/api@1.10.0)
+
   '@opentelemetry/exporter-metrics-otlp-proto@0.301.1(@opentelemetry/api@1.10.0)':
     dependencies:
       '@opentelemetry/api': 1.10.0
@@ -727,6 +753,12 @@ snapshots:
       '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)
       '@opentelemetry/otlp-transformer': 0.301.1(@opentelemetry/api@1.10.0)
 
+  '@opentelemetry/otlp-exporter-base@0.301.2(@opentelemetry/api@1.10.0)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/otlp-transformer': 0.301.2(@opentelemetry/api@1.10.0)
+
   '@opentelemetry/otlp-grpc-exporter-base@0.301.1(@opentelemetry/api@1.10.0)':
     dependencies:
       '@grpc/grpc-js': 1.14.7
@@ -736,6 +768,15 @@ snapshots:
       '@opentelemetry/otlp-transformer': 0.301.1(@opentelemetry/api@1.10.0)
 
   '@opentelemetry/otlp-transformer@0.301.1(@opentelemetry/api@1.10.0)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/resources': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-logs': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-metrics': 3.1.1(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-trace': 3.1.1(@opentelemetry/api@1.10.0)
+
+  '@opentelemetry/otlp-transformer@0.301.2(@opentelemetry/api@1.10.0)':
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@opentelemetry/core': 3.1.1(@opentelemetry/api@1.10.0)

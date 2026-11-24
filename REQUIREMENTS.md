@@ -11,7 +11,7 @@ Tienda de 3 capas (web Nginx → API Node.js → Redis, MariaDB Galera y MongoDB
 | Parte | Qué es | Estado |
 |---|---|---|
 | 1 | Todo en una laptop con Docker Compose (HAProxy, Keepalived, Nagios, laboratorio de pruebas) | Hecha y verificada |
-| 2 | Migrar a Kubernetes (K3s) según el [PLATFORM-MIGRATION-PLAN.md](https://github.com/tuxtter/distributedsystems/blob/main/PLATFORM-MIGRATION-PLAN.md) del profe | En curso: fases 0 y 2 del plan hechas en k3d (sección 5.1) |
+| 2 | Migrar a Kubernetes (K3s) según el [PLATFORM-MIGRATION-PLAN.md](https://github.com/tuxtter/distributedsystems/blob/main/PLATFORM-MIGRATION-PLAN.md) del profe | En curso: fases 0 a 7 hechas en el clúster de desarrollo (k3d, sección 5); faltan el clúster real (sección 6) y la fase 8. Wazuh es opcional por indicación del profe |
 
 **Entrega de la Parte 2: 30/11/2026.** Documentación de la implementación, repositorio del proyecto y resultados de las pruebas de desempeño. En equipo, debe haber **un nodo del clúster en cada computadora**.
 
@@ -229,63 +229,73 @@ sops --encrypt --in-place credentials/dev/<nuevo>.yaml
 
 ## 6. Parte 2, modo entrega: clúster K3s real, un nodo por laptop
 
-> **⚠ POR VALIDAR.** Estos pasos siguen la documentación oficial de K3s y de WSL, pero aún no se han corrido en la laptop B.
+> **⚠ POR VALIDAR.** Estos pasos siguen la documentación oficial de K3s, Tailscale y WSL, pero aún no se han corrido en la laptop B.
 > Si un paso falla, no improvises: copia el error exacto (y la salida de `journalctl -u k3s-agent -n 100 --no-pager`) y avisa.
 
-### 6.1 Elegir la red entre las dos laptops
+Decisiones del 2026-11-24:
 
-Las dos laptops deben alcanzarse entre sí. Puertos que K3s necesita abiertos entre nodos:
+- **Red:** Tailscale en las dos laptops. En la laptop B va **dentro de Ubuntu (WSL2)**, no en Windows, para que exista la interfaz `tailscale0` que usa K3s.
+- **La laptop B tiene 8 GB:** es un nodo ligero. Al unirse recibe el taint `tienda/ligero=true:NoSchedule` y solo corre los pods que lo toleran: web, API, worker y el agente de OpenTelemetry. Todo lo pesado (bases de datos, RabbitMQ, observabilidad y Flux) queda en la laptop A. WSL2 se limita a 4 GB.
+- **Imágenes:** GHCR público. La laptop B las baja de `ghcr.io` sin contraseña.
+
+Puertos que K3s usa entre los nodos. Van por Tailscale: no hay que abrir nada en los firewalls.
 
 | Protocolo | Puerto | Quién → quién | Para qué |
 |---|---|---|---|
 | TCP | 6443 | laptop B → laptop A | API de Kubernetes y registro de nodos |
 | UDP | 8472 | entre las dos | red de pods (Flannel VXLAN) |
-| TCP | 10250 | entre las dos | métricas del kubelet |
+| TCP | 10250 | entre las dos | métricas y logs del kubelet |
 
-**Opción 1, misma red (LAN):** la más simple. Úsala si las dos laptops están en el mismo Wi-Fi y no se bloquean entre ellas. Desventaja: si el router cambia la IP (DHCP), hay que reinstalar el nodo.
+### 6.1 Tailscale en la laptop A
 
-**Opción 2, Tailscale:** IPs fijas (`100.x.y.z`) que funcionan en cualquier red. Instala Tailscale en las dos laptops (misma cuenta o tailnet), y usa esas IPs como `IP_A` e `IP_B`. Agrega `--flannel-iface tailscale0` a los dos comandos de K3s de abajo. Para las pruebas de desempeño, procura que las laptops estén en la misma LAN: así Tailscale usa la ruta directa.
-
-**Cómo decidir:** con el servidor de la laptop A ya instalado (6.3), corre esto desde la laptop B. Si responde `pong`, usa la opción 1; si no, la opción 2:
+Con `sudo` (lo corre la persona):
 
 ```bash
-ping -c 3 "$IP_A"
-curl -sk --max-time 5 "https://$IP_A:6443/ping"
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo systemctl enable --now tailscaled
+sudo tailscale up            # abre el enlace que muestra e inicia sesión
+tailscale ip -4              # la IP_A (100.x.y.z)
 ```
+
+Para que la laptop B entre a tu red de Tailscale sin usar tu cuenta: en la consola de Tailscale, **Settings → Keys → Generate auth key** (de un solo uso). Es un secreto: pásala por un canal privado.
 
 ### 6.2 Preparar la laptop B (Windows 11 + WSL2)
 
-Requisito: Windows 11 versión 22H2 o más nueva (`winver`) y WSL actualizado (`wsl --update`, `wsl --version`).
+Requisito: Windows 11 22H2 o más nuevo (`winver`) y WSL actualizado (`wsl --update`, `wsl --version`).
 
-1. Crea o edita `%UserProfile%\.wslconfig` (en PowerShell: `notepad $env:UserProfile\.wslconfig`):
+1. Limita la RAM de WSL. En PowerShell, `notepad $env:UserProfile\.wslconfig`, y deja:
 
    ```ini
    [wsl2]
-   networkingMode=mirrored
-   memory=8GB
-   processors=4
+   memory=4GB
    ```
 
-   `mirrored` hace que WSL use la misma red que Windows, y así la laptop A puede alcanzar el nodo. `memory` limita la RAM de WSL (por defecto toma el 50 %). Ajusta los números a tu equipo.
+   Windows se queda con los otros 4 GB. No hace falta `networkingMode=mirrored` ni abrir el firewall de Hyper-V: el tráfico del clúster entra por Tailscale.
 
-2. En **PowerShell como administrador**, permite conexiones entrantes hacia WSL:
-
-   ```powershell
-   Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow
-   ```
-
-3. Instala Ubuntu si no lo tienes (`wsl --install -d Ubuntu-24.04`) y activa systemd. Dentro de Ubuntu:
+2. Instala Ubuntu si no lo tienes (`wsl --install -d Ubuntu-24.04`) y activa systemd. Dentro de Ubuntu:
 
    ```bash
    printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf
    ```
 
-4. En PowerShell: `wsl.exe --shutdown`. Abre Ubuntu otra vez y verifica:
+3. En PowerShell: `wsl.exe --shutdown`. Abre Ubuntu otra vez y verifica:
 
    ```bash
    systemctl is-system-running      # "running" o "degraded" (ambos sirven)
-   ip -4 addr show                  # debe mostrar la misma IP que Windows (mirrored)
+   free -h                          # total cerca de 4 GB
    ```
+
+4. Tailscale dentro de Ubuntu, con la clave de un solo uso de la sección 6.1:
+
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   read -rs TS_KEY                                   # pega la clave y Enter (no se muestra)
+   sudo tailscale up --auth-key="$TS_KEY" && unset TS_KEY
+   tailscale ip -4                                   # la IP_B (100.x.y.z)
+   tailscale ping <IP_A>                             # "via <ip>:<puerto>" = directo; "via DERP" = por relevo
+   ```
+
+   Si solo sale por DERP, el clúster funciona pero más lento. Para las pruebas de desempeño, pongan las dos laptops en la misma red Wi-Fi.
 
 5. Clona el repo y corre `bash scripts/install-cli-tools.sh` dentro de Ubuntu (sección 3.3).
 
@@ -293,56 +303,64 @@ WSL apaga su máquina virtual cuando queda inactiva: **mantén una terminal de U
 
 ### 6.3 Laptop A: instalar el servidor
 
-Necesita `sudo` (pide la contraseña). Pídele a la persona que lo corra en su terminal.
+1. Libera RAM: apaga Compose y el clúster de desarrollo (no se borran datos):
 
-```bash
-export IP_A=<IP de la laptop A en la red elegida>        # sección 6.1
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.37.2+k3s1" sh -s - server \
-  --cluster-init --node-name lap-a --node-ip "$IP_A" --advertise-address "$IP_A" \
-  --tls-san "$IP_A" --secrets-encryption
-```
+   ```bash
+   docker compose stop          # en la carpeta del repo
+   k3d cluster stop tienda
+   ```
 
-Verificar y sacar el token (el token es un secreto: pásalo a la laptop B por un canal privado, nunca por git):
+2. Genera los scripts de instalación con Terraform (fase 1 del plan). Copia `infra/terraform/envs/prod-nodes/terraform.tfvars.example` a `terraform.tfvars` (no va a git), pon las dos IP de Tailscale y corre:
 
-```bash
-sudo k3s kubectl get nodes                      # lap-a en "Ready"
-sudo cat /var/lib/rancher/k3s/server/node-token # el token
-```
+   ```bash
+   terraform -chdir=infra/terraform/envs/prod-nodes init
+   terraform -chdir=infra/terraform/envs/prod-nodes apply
+   ```
 
-Para usar `kubectl` sin `sudo` en la laptop A:
+   Salen `generated/install-lap-a.sh` e `install-lap-b.sh`. Solo llevan IP, no secretos.
 
-```bash
-mkdir -p ~/.kube && sudo install -m 600 -o "$USER" -g "$USER" /etc/rancher/k3s/k3s.yaml ~/.kube/config-real
-export KUBECONFIG=~/.kube/config-real
-```
+3. Instala el servidor (pide `sudo`) y saca el token. El token es un secreto: pásalo a la laptop B por un canal privado, nunca por git.
 
-Los puertos `80` y `443` de la laptop A los usa Docker Compose (Parte 1): si el servicio de Traefik de K3s no arranca por eso, apaga Compose o avisa para cambiar los puertos de Traefik.
+   ```bash
+   bash infra/terraform/envs/prod-nodes/generated/install-lap-a.sh
+   sudo cat /var/lib/rancher/k3s/server/node-token
+   ```
+
+4. Para usar `kubectl` sin `sudo`:
+
+   ```bash
+   mkdir -p ~/.kube && sudo install -m 600 -o "$USER" -g "$USER" /etc/rancher/k3s/k3s.yaml ~/.kube/config-real
+   export KUBECONFIG=~/.kube/config-real
+   ```
 
 ### 6.4 Laptop B: unir el nodo
 
-Dentro de Ubuntu (WSL2). El token no debe quedar en archivos del repo ni en el historial compartido.
+Dentro de Ubuntu. Corre el `install-lap-b.sh` que te pase la laptop A (`bash install-lap-b.sh`; pide el token sin mostrarlo). Equivale a:
 
 ```bash
-export IP_A=<IP de la laptop A>
-export IP_B=<IP de la laptop B en la misma red>
 read -rs K3S_TOKEN && export K3S_TOKEN       # pega el token y Enter (no se muestra)
-curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.37.2+k3s1" K3S_URL="https://$IP_A:6443" \
-  sh -s - agent --node-name lap-b --node-ip "$IP_B"
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.37.2+k3s1" K3S_URL="https://<IP_A>:6443" \
+  sh -s - agent --node-name lap-b --node-ip <IP_B> --flannel-iface tailscale0 \
+  --node-taint tienda/ligero=true:NoSchedule
 sudo systemctl status k3s-agent --no-pager
 ```
+
+El taint solo se pone al registrar el nodo. Si el nodo se unió sin él, agrégalo desde la laptop A: `kubectl taint node lap-b tienda/ligero=true:NoSchedule`.
 
 ### 6.5 Verificar el clúster (desde la laptop A)
 
 ```bash
-kubectl get nodes -o wide     # lap-a y lap-b en "Ready"
-kubectl get pods -A -o wide   # pods repartidos en las dos laptops (columna NODE)
+kubectl get nodes -o wide                       # lap-a y lap-b en "Ready"
+kubectl describe node lap-b | grep Taints       # tienda/ligero=true:NoSchedule
+kubectl get pods -A -o wide --field-selector spec.nodeName=lap-b   # solo web, api, worker y otel-agent
+kubectl top node                                # RAM usada en cada laptop
 ```
 
 Con eso se cumple lo que pidió el profe: un nodo del clúster en cada computadora.
 
 ### 6.6 Pendiente de documentar aquí
 
-Cómo llegan las imágenes a la laptop B (GHCR o registro local), cómo se despliega con Flux y cómo correr las pruebas de desempeño. Se agrega conforme se implementa.
+Cómo se despliega `prod` con Flux (Terraform `envs/prod`) y cómo correr las pruebas de desempeño. Se agrega conforme se implementa.
 
 ## 7. Límites conocidos
 
@@ -359,9 +377,9 @@ Cómo llegan las imágenes a la laptop B (GHCR o registro local), cómo se despl
 - **MongoDB:** el plan nombra al "MongoDB Community Operator", pero ese repositorio está archivado desde noviembre de 2025. Se usa su sucesor, MongoDB Controllers for Kubernetes (chart `mongodb-kubernetes` 1.15.0), que trae el mismo recurso `MongoDBCommunity`. Solo vigila el namespace donde corre, por eso su operador está en `tienda`.
 - **MaxScale** (proxy de MariaDB) tiene licencia BSL: es gratis para este proyecto, pero no es software libre.
 - **Redis:** la imagen que usa el operador es `redis:v7.0.15`, antigua. Trivy puede marcarla en CI; si pasa, se actualiza la etiqueta en `deploy/platform/data/redis.yaml`.
-- **Flux en dev** está instalado sin Git: los manifiestos se aplican a mano con `kubectl apply -k` (sección 5.1). El repositorio y `flux bootstrap` llegan con Terraform.
-- **`deploy/overlays/prod`** tiene `OWNER/REPO` y `PENDIENTE` como marcadores hasta que exista el repositorio de GitHub; no se despliega todavía.
-- En el flujo manual (5.1) las contraseñas de la base de datos son una por servicio con todos los permisos de su base, igual que en Compose. Con Flux (5.2) la API usa un usuario de solo lectura en MariaDB y `tienda` exige Pod Security `restricted` (docs/05-seguridad.md). Redis con clave llega con el endurecimiento (fase 7).
+- **Flux en dev** sigue la rama `main` del repositorio (sección 5.2). La sección 5.1 aplica lo mismo a mano, sin Git.
+- **`prod`** todavía no se ha desplegado: la rama `release` va atrás de `main` y falta `credentials/prod` (sección 6.6).
+- Las contraseñas de las bases son al azar en los dos flujos (5.1 con `scripts/create-dev-secrets.sh`, 5.2 con SOPS). La API usa un usuario de solo lectura en MariaDB (`store_api`) y `tienda` exige Pod Security `restricted`. Redis queda sin contraseña: riesgo aceptado (docs/05-seguridad.md).
 
 ## 8. Lista de verificación para la entrega (30/11/2026)
 

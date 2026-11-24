@@ -75,4 +75,4 @@ secretos de variables de entorno, 12-factor) y `CKV_K8S_43` (sin digest: dev usa
 | Aprobación manual en `terraform.yml` | Los *environments* con revisores obligatorios dependen del plan de GitHub para repos privados |
 | Pruebas | La API no tiene pruebas unitarias; el CI solo revisa que compile. El worker tiene pruebas de sus manejadores (`node --test`), sin broker real: RabbitMQ no se prueba en CI |
 | Firma con cosign | Sin llaves: la identidad del workflow (repositorio y commit) queda en el registro público Rekor |
-| Clave age | Está en `~/.config/sops/age/keys.txt` de la laptop A. Si se pierde no se pueden editar los Secrets cifrados (se regeneran): hay que respaldarla |
+| Claves age | Una por entorno, en la laptop A: dev en `~/.config/sops/age/keys.txt` y prod en `~/.config/sops/age/prod.txt` (la de dev no descifra prod). Si se pierde una, no se pueden editar los Secrets cifrados de su entorno (se regeneran): hay que respaldar las dos |

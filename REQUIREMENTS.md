@@ -365,8 +365,9 @@ Los Secrets de prod están en `credentials/prod/`, cifrados con **su propia clav
 1. Antes de arrancar Flux, la clave que descifra los Secrets:
 
    ```bash
-   kubectl create namespace flux-system
-   kubectl -n flux-system create secret generic sops-age --from-file=age.agekey="$HOME/.config/sops/age/prod.txt"
+   # --kubeconfig fija el clúster real: sin él, kubectl usa el contexto de dev (k3d-tienda)
+   kubectl --kubeconfig ~/.kube/config-real create namespace flux-system
+   kubectl --kubeconfig ~/.kube/config-real -n flux-system create secret generic sops-age --from-file=age.agekey="$HOME/.config/sops/age/prod.txt"
    ```
 
 2. Pendiente: arrancar Flux con Terraform (`envs/prod`) y correr las pruebas de desempeño. Se agrega conforme se implementa.

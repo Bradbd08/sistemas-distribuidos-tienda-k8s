@@ -5,9 +5,10 @@
 #      Permiso: "Commit statuses: Read and write". Nada más.
 #   2. Guárdalo cifrado, sin pegarlo en ningún chat:
 #        kubectl -n flux-system create secret generic github-token --from-literal=token="$(read -rs t; echo $t)" \
-#          --dry-run=client -o yaml > credentials/dev/github-token.yaml
-#        sops --encrypt --in-place credentials/dev/github-token.yaml
-#   3. Haz commit y push, y reanuda:  flux resume kustomization notifications
+#          --dry-run=client -o yaml > credentials/<entorno>/github-token.yaml      (dev o prod)
+#        sops --encrypt --in-place credentials/<entorno>/github-token.yaml
+#   3. Quita "suspend: true" de clusters/<entorno>/notifications.yaml y haz commit y push.
+#      Un "flux resume" a mano no basta: Flux lo vuelve a suspender en la siguiente reconciliación.
 apiVersion: notification.toolkit.fluxcd.io/v1
 kind: Provider
 metadata:

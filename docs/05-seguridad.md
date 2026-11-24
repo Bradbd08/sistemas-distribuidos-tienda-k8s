@@ -152,5 +152,5 @@ kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u 
 | Grafana sin el certificado de la tienda | `grafana.localhost` sigue con el certificado por defecto de Traefik y por HTTP |
 | Un solo usuario | Todas las escrituras comparten `admin`. No hay usuarios por persona |
 | Mongo y Redis sin usuario por servicio | La API y el worker comparten `store-app` en MongoDB; Redis no tiene contraseña |
-| `prod` sin Secret | `credentials/prod/` aún no existe (Etapa 6). Crear `ingress-admin-auth` **antes** de desplegar `prod`: por el código de Traefik, si falta el Secret la ruta de escrituras se descarta y caerían en el `Ingress` sin contraseña. No está probado (hallazgo 22) |
+| Secret del ingress en `prod` | `credentials/prod/ingress-admin-auth.yaml` existe desde el 2026-11-24. Por el código de Traefik, si faltara el Secret la ruta de escrituras se descartaría y caerían en el `Ingress` sin contraseña. No está probado (hallazgo 22) |
 | El límite es por IP de origen | Traefik cuenta por IP de origen. En k3d las peticiones entran por los 3 nodos y, por lo medido, Traefik las ve con 3 IP distintas: el límite efectivo es unas 3 veces el configurado (300 `POST` en 0,45 s: pasaron 144, y con 20 por segundo y ráfaga de 40 se esperaban unas 49). No se comprobó la IP de origen (hallazgo 26) |

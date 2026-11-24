@@ -358,9 +358,18 @@ kubectl top node                                # RAM usada en cada laptop
 
 Con eso se cumple lo que pidió el profe: un nodo del clúster en cada computadora.
 
-### 6.6 Pendiente de documentar aquí
+### 6.6 Desplegar `prod` con Flux
 
-Cómo se despliega `prod` con Flux (Terraform `envs/prod`) y cómo correr las pruebas de desempeño. Se agrega conforme se implementa.
+Los Secrets de prod están en `credentials/prod/`, cifrados con **su propia clave age** (la de dev no los descifra). La clave privada vive en `~/.config/sops/age/prod.txt` de la laptop A: respáldala (por ejemplo, en un gestor de contraseñas). Sin ella no se pueden descifrar. La contraseña de las escrituras de prod está en `~/.config/tienda/ingress-admin-prod.txt`.
+
+1. Antes de arrancar Flux, la clave que descifra los Secrets:
+
+   ```bash
+   kubectl create namespace flux-system
+   kubectl -n flux-system create secret generic sops-age --from-file=age.agekey="$HOME/.config/sops/age/prod.txt"
+   ```
+
+2. Pendiente: arrancar Flux con Terraform (`envs/prod`) y correr las pruebas de desempeño. Se agrega conforme se implementa.
 
 ## 7. Límites conocidos
 
@@ -378,7 +387,7 @@ Cómo se despliega `prod` con Flux (Terraform `envs/prod`) y cómo correr las pr
 - **MaxScale** (proxy de MariaDB) tiene licencia BSL: es gratis para este proyecto, pero no es software libre.
 - **Redis:** la imagen que usa el operador es `redis:v7.0.15`, antigua. Trivy puede marcarla en CI; si pasa, se actualiza la etiqueta en `deploy/platform/data/redis.yaml`.
 - **Flux en dev** sigue la rama `main` del repositorio (sección 5.2). La sección 5.1 aplica lo mismo a mano, sin Git.
-- **`prod`** todavía no se ha desplegado: la rama `release` va atrás de `main` y falta `credentials/prod` (sección 6.6).
+- **`prod`** todavía no se ha desplegado: la rama `release` va atrás de `main` y falta arrancar Flux en el clúster real (sección 6.6).
 - Las contraseñas de las bases son al azar en los dos flujos (5.1 con `scripts/create-dev-secrets.sh`, 5.2 con SOPS). La API usa un usuario de solo lectura en MariaDB (`store_api`) y `tienda` exige Pod Security `restricted`. Redis queda sin contraseña: riesgo aceptado (docs/05-seguridad.md).
 
 ## 8. Lista de verificación para la entrega (30/11/2026)

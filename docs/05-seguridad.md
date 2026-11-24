@@ -1,6 +1,6 @@
-# 05. Seguridad y endurecimiento (fase 7) — EN CURSO
+# 05. Seguridad y endurecimiento (fase 7)
 
-Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mínima (es lo que más RAM pide).
+El 2026-11-24 el profe hizo opcional a Wazuh porque es lo que más RAM pide. La fase 7 se cierra con lo hecho; lo que no se hizo está en «Lo que no se hizo», con el motivo.
 
 ## Estado
 
@@ -9,11 +9,20 @@ Se hace primero lo barato y de poco riesgo. Wazuh va al final y en versión mín
 | Pod Security Admission en `tienda` | Hecha: `restricted` obligatorio (las bases también cumplen) |
 | Contenedores sin root, sistema de archivos de solo lectura | Sin root ni escalada de privilegios en todo `tienda`. Solo lectura en web, API, worker, RabbitMQ y MongoDB; no en MariaDB, MaxScale ni Redis (no se probó) |
 | Autenticación y límite de frecuencia en el ingress | Hecha: toda escritura (método distinto de `GET`, `HEAD` y `OPTIONS`) pide HTTPS, contraseña y límite |
-| Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumplía y MariaDB está hecha (la API usa un usuario de solo lectura). Redis: pendiente |
+| Usuarios de base de datos con mínimo privilegio | MongoDB ya lo cumplía y MariaDB está hecha (la API usa un usuario de solo lectura). Redis sin contraseña: riesgo aceptado (abajo) |
 | TLS con cert-manager | Hecha: CA propia y HTTPS en el ingress. Las escrituras de la API solo entran por HTTPS |
-| Verificación de firmas con Kyverno | Pendiente |
-| kube-bench (CIS) | Pendiente |
-| Wazuh (manager, indexador, panel y agentes) | Pendiente, al final |
+| Verificación de firmas con Kyverno | No se hizo (abajo) |
+| kube-bench (CIS) | No se hizo (abajo) |
+| Wazuh (manager, indexador, panel y agentes) | Opcional por indicación del profe; no se hizo |
+
+## Lo que no se hizo
+
+| Medida | Por qué | Qué la cubre en parte |
+|---|---|---|
+| Wazuh | El profe lo hizo opcional el 2026-11-24: su indexador pide varios GB de RAM y la laptop B tiene 8 GB | Pod Security `restricted`, NetworkPolicies, Trivy en CI y las alertas de Grafana |
+| Kyverno y kube-bench | Decisión del equipo el 2026-11-24: el tiempo que quedaba se dio al clúster real y a la fase 8 | `release.yml` ya firma las imágenes con cosign; falta quien verifique la firma al desplegar |
+| Contraseña de Redis | El ToDo (punto 6) la pide si Redis se alcanza fuera de una red de confianza. Aquí Redis solo es caché y las NetworkPolicies limitan quién llega a él | `deploy/platform/network-policies/data.yaml` |
+| Usuario propio en RabbitMQ | La API y el worker usan `rabbitmq-default-user`, que es administrador. Crearlo con manifiestos pide el operador de topología de RabbitMQ, que no está instalado | `deploy/platform/network-policies/messaging.yaml` |
 
 ## Pod Security Admission
 

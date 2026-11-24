@@ -6,7 +6,9 @@ set -euo pipefail
 read -rs -p "Token del servidor (no se muestra): " K3S_TOKEN
 echo
 export K3S_TOKEN
+# Los agentes son laptops con poca RAM: el taint deja entrar solo a web, API, worker y otel-agent (REQUIREMENTS 6).
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${k3s_version}" K3S_URL="https://${server_ip}:6443" \
-  sh -s - agent --node-name ${node_name} --node-ip ${ip} ${common_flags}
+  sh -s - agent --node-name ${node_name} --node-ip ${ip} ${common_flags} \
+  --node-taint tienda/ligero=true:NoSchedule
 
 sudo systemctl status k3s-agent --no-pager

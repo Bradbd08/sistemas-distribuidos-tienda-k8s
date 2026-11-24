@@ -17,5 +17,5 @@ mk() {
   k create secret generic "$name" "${args[@]}" >/dev/null && echo "creado:    $name"
 }
 
-mk mariadb-credentials root-password app-password
+mk mariadb-credentials root-password app-password api-password
 mk mongodb-app-password password

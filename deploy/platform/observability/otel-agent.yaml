@@ -26,6 +26,11 @@ spec:
   values:
     fullnameOverride: otel-agent
     mode: daemonset
+    # También en la laptop B (taint tienda/ligero), para recoger los logs de los pods que corren ahí.
+    tolerations:
+      - key: tienda/ligero
+        operator: Exists
+        effect: NoSchedule
     image:
       repository: otel/opentelemetry-collector-k8s
     presets:

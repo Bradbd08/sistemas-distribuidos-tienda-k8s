@@ -27,7 +27,7 @@ spec:
     size: 256
     rotationPolicy: Never # al renovarse conserva la clave, y lo que ya confía en la CA sigue confiando
   # Esta CA solo puede firmar nombres locales: si su clave se filtrara, no serviría para suplantar otros sitios en un
-  # navegador que la haya importado. shortcut: en prod (Etapa 6) ampliar "permitted" junto con dnsNames de tienda-tls.
+  # navegador que la haya importado. En prod, deploy/overlays/prod le agrega la IP de Tailscale de la laptop A.
   nameConstraints:
     critical: true
     permitted:
@@ -59,8 +59,8 @@ metadata:
     app.kubernetes.io/part-of: tienda
 spec:
   secretName: tienda-tls
-  # shortcut: solo localhost (k3d). En prod (Etapa 6): entrar por un nombre (por ejemplo el de Tailscale o una línea en
-  # /etc/hosts) y ponerlo aquí. Por IP el cliente no manda SNI y Traefik usa su certificado por defecto (haría falta un TLSStore).
+  # Aquí solo localhost (k3d). En prod, deploy/overlays/prod agrega la IP de Tailscale de la laptop A y un TLSStore,
+  # porque por IP el cliente no manda SNI y Traefik serviría su certificado por defecto.
   dnsNames:
     - localhost
   # Sin "usages", cert-manager no agrega server auth y macOS marca el certificado como no confiable.

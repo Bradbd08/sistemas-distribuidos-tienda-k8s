@@ -310,7 +310,7 @@ WSL apaga su máquina virtual cuando queda inactiva: **mantén una terminal de U
    k3d cluster stop tienda
    ```
 
-2. Genera los scripts de instalación con Terraform (fase 1 del plan). Copia `infra/terraform/envs/prod-nodes/terraform.tfvars.example` a `terraform.tfvars` (no va a git), pon las dos IP de Tailscale y corre:
+2. Genera los scripts de instalación con Terraform (fase 1 del plan). Copia `infra/terraform/envs/prod-nodes/terraform.tfvars.example` a `terraform.tfvars` (no va a git), pon las dos IP de Tailscale y corre (la IP de lap-a debe ser `100.94.162.3`, la que lleva el certificado de prod en `deploy/overlays/prod`; si cambia, ver docs/05-seguridad.md):
 
    ```bash
    terraform -chdir=infra/terraform/envs/prod-nodes init

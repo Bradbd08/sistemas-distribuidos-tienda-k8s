@@ -91,9 +91,9 @@ de la tienda están en `deploy/base/tls.yaml`, en el namespace `tienda`:
 | Objeto | Qué hace |
 |---|---|
 | `Issuer autofirmado` | Solo firma la CA |
-| `Certificate tienda-ca` | La CA propia (10 años, conserva su clave al renovarse). Solo puede firmar `localhost` y 127.0.0.0/8 (restricción de nombres). Su Secret `tienda-ca` guarda la clave y no debe salir del clúster |
+| `Certificate tienda-ca` | La CA propia (10 años, conserva su clave al renovarse). Solo puede firmar `localhost`, 127.0.0.0/8 y ::1 (restricción de nombres); en `prod`, también `100.94.162.3/32` (`deploy/overlays/prod`). Su Secret `tienda-ca` guarda la clave y no debe salir del clúster |
 | `Issuer tienda-ca` | Firma con esa CA |
-| `Certificate tienda-tls` | El certificado de `localhost` (90 días). cert-manager lo renueva solo, 30 días antes de que venza |
+| `Certificate tienda-tls` | El certificado de `localhost` y, en `prod`, también de `100.94.162.3` (90 días). cert-manager lo renueva solo, 30 días antes de que venza |
 
 `tienda-escrituras` carga el Secret `tienda-tls`. Traefik elige el certificado por el nombre que pide el cliente (SNI), así que las lecturas por
 `https://localhost:8443` usan el mismo. Si el Secret faltara, Traefik solo avisa en su log y usa su certificado por defecto: la ruta con contraseña sigue.
@@ -106,7 +106,7 @@ curl --cacert tienda-ca.crt https://localhost:8443/        # sin -k
 ```
 
 En el navegador, importa `tienda-ca.crt` como autoridad en su gestor de certificados (sección «Autoridades»). Sin eso avisa que el sitio no es de confianza.
-Se importa una vez por clúster: si se recrea el clúster o se borra el Secret `tienda-ca`, cert-manager crea una CA nueva y hay que importarla otra vez.
+Se importa una vez por clúster: si se recrea el clúster, se borra el Secret `tienda-ca` o cambia la IP de Tailscale de la laptop A, sale una CA nueva y hay que importarla otra vez. Si cambia esa IP: cámbiala en los dos parches de `deploy/overlays/prod/kustomization.yaml` y reemite la CA con `cmctl renew -n tienda tienda-ca` (se instala aparte), porque cert-manager no la reemite solo por cambiar su restricción de nombres.
 
 Para comprobar la entrada completa (no escribe nada; la contraseña se lee a un archivo temporal y no se imprime):
 
@@ -143,13 +143,13 @@ kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u 
 | Tema | Detalle |
 |---|---|
 | CA propia | Ningún navegador confía en ella hasta que se importa `tienda-ca.crt` (una vez por clúster). Una CA pública como Let's Encrypt pide un dominio real |
-| Clave de la CA | Vive en el Secret `tienda-ca`. La pueden leer los pods con permiso de leer Secrets (MongoDB, Traefik, Grafana, Loki, los operadores y Flux). Por eso la CA solo puede firmar nombres locales |
-| Solo `localhost` | El certificado y la CA son para `localhost`. En `prod` (Etapa 6): entrar por un nombre, ponerlo en `dnsNames` de `deploy/base/tls.yaml` y ampliar `permitted` de la CA. Por IP el cliente no manda SNI y Traefik usa su certificado por defecto (haría falta un `TLSStore`) |
+| Clave de la CA | Vive en el Secret `tienda-ca`. La pueden leer los pods con permiso de leer Secrets (MongoDB, Traefik, Grafana, Loki, los operadores y Flux). Por eso la CA solo puede firmar `localhost` y loopback, y en `prod` la IP de Tailscale de la laptop A: con la clave filtrada se podría suplantar esa IP ante quien importó la CA, pero no otros sitios |
+| Nombres del certificado | En dev, solo `localhost`. En `prod`, también la IP de Tailscale de la laptop A (`100.94.162.3`), con un `TLSStore` para que Traefik sirva este certificado aunque el cliente no mande SNI (`deploy/overlays/prod`). Sin probar en vivo |
 | La redirección 308 | Evita que la escritura se procese por HTTP, pero no recupera una contraseña que el cliente ya mandó en esa petición. Escribe siempre `https://` |
 | cert-manager en Kubernetes 1.37 | cert-manager 1.21 declara soporte para Kubernetes 1.33 a 1.36 y este clúster es 1.37 (K3s). Está fuera de su tabla oficial. Se instaló el 2026-11-15 y funciona: `HelmRelease` listo, certificados emitidos y servidos; la renovación aún no se ha visto |
 | Webhook de cert-manager | Los `Issuer` y `Certificate` van en la capa `apps`. Si el webhook de cert-manager (1 réplica) no responde, `apps` no aplica cambios hasta que vuelva (Flux reintenta cada 2 minutos) |
 | TLS solo en la entrada | Dentro del clúster (Traefik a la web, API a las bases, AMQP) el tráfico va sin cifrar. El mTLS entre servicios es opcional en el plan y no se hizo |
-| Grafana sin el certificado de la tienda | `grafana.localhost` sigue con el certificado por defecto de Traefik y por HTTP |
+| Grafana sin el certificado de la tienda | `grafana.localhost` va por HTTP. Por HTTPS recibe el certificado por defecto de Traefik (en `prod`, por el `TLSStore`, es `tienda-tls`), que no incluye ese nombre: el navegador avisa |
 | Un solo usuario | Todas las escrituras comparten `admin`. No hay usuarios por persona |
 | Mongo y Redis sin usuario por servicio | La API y el worker comparten `store-app` en MongoDB; Redis no tiene contraseña |
 | Secret del ingress en `prod` | `credentials/prod/ingress-admin-auth.yaml` existe desde el 2026-11-24. Por el código de Traefik, si faltara el Secret la ruta de escrituras se descartaría y caerían en el `Ingress` sin contraseña. No está probado (hallazgo 22) |

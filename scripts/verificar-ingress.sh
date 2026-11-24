@@ -3,7 +3,8 @@
 # HTTP y por HTTPS piden contraseña, también con rutas raras que Traefik y nginx leen distinto. No escribe nada: las
 # escrituras llevan un cuerpo inválido y la API responde 400 sin guardar. Termina con código 1 si algo falla.
 # Uso: [KUBE_CONTEXT=contexto] bash scripts/verificar-ingress.sh [URL_HTTP] [URL_HTTPS]   (por defecto, el k3d de desarrollo)
-# En la Etapa 6 usa en las URLs un nombre que esté en el certificado (dnsNames de deploy/base/tls.yaml).
+# En prod (desde la laptop A) se entra por la IP de Tailscale, que va en ipAddresses (deploy/overlays/prod). Sin SNI, así se prueba el TLSStore:
+#   KUBECONFIG=~/.kube/config-real KUBE_CONTEXT=default bash scripts/verificar-ingress.sh http://100.94.162.3 https://100.94.162.3
 set -euo pipefail
 umask 077
 

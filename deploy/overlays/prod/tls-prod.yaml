@@ -1,0 +1,11 @@
+# En prod se entra por la IP de Tailscale de la laptop A (REQUIREMENTS 6). Por IP el cliente no manda SNI y Traefik
+# usaría su certificado por defecto: este TLSStore "default" hace que sirva el de la tienda (tienda-tls).
+# Traefik toma el TLSStore llamado "default" de cualquier namespace; el Secret debe estar en el mismo (tienda).
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: tienda
+spec:
+  defaultCertificate:
+    secretName: tienda-tls

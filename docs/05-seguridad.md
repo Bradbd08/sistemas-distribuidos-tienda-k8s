@@ -144,7 +144,7 @@ kubectl -n tienda exec mariadb-0 -c mariadb -- env MYSQL_PWD="$ROOT" mariadb -u 
 |---|---|
 | CA propia | Ningún navegador confía en ella hasta que se importa `tienda-ca.crt` (una vez por clúster). Una CA pública como Let's Encrypt pide un dominio real |
 | Clave de la CA | Vive en el Secret `tienda-ca`. La pueden leer los pods con permiso de leer Secrets (MongoDB, Traefik, Grafana, Loki, los operadores y Flux). Por eso la CA solo puede firmar nombres locales |
-| Solo `localhost` | El certificado y la CA son para `localhost`. En `prod` (Etapa 6): entrar por un nombre, ponerlo en `dnsNames` de `deploy/base/tls.yaml` y ampliar `permitted` de la CA. Por IP el cliente no manda SNI y Traefik usa su certificado por defecto (haría falta un `TLSStore`) |
+| Nombres del certificado | En dev, solo `localhost`. En `prod`, también la IP de Tailscale de la laptop A (`100.94.162.3`), con un `TLSStore` para que Traefik sirva este certificado aunque el cliente no mande SNI (`deploy/overlays/prod`). Sin probar en vivo |
 | La redirección 308 | Evita que la escritura se procese por HTTP, pero no recupera una contraseña que el cliente ya mandó en esa petición. Escribe siempre `https://` |
 | cert-manager en Kubernetes 1.37 | cert-manager 1.21 declara soporte para Kubernetes 1.33 a 1.36 y este clúster es 1.37 (K3s). Está fuera de su tabla oficial. Se instaló el 2026-11-15 y funciona: `HelmRelease` listo, certificados emitidos y servidos; la renovación aún no se ha visto |
 | Webhook de cert-manager | Los `Issuer` y `Certificate` van en la capa `apps`. Si el webhook de cert-manager (1 réplica) no responde, `apps` no aplica cambios hasta que vuelva (Flux reintenta cada 2 minutos) |

@@ -35,6 +35,8 @@ patches:
         path: /spec/ipAddresses
         value:
           - 100.94.162.3
+  # Si cambia la IP: cámbiala en los dos parches y reemite la CA (cmctl renew -n tienda tienda-ca); cert-manager no la
+  # reemite por cambiar nameConstraints. Después hay que importar la CA nueva en cada cliente.
   - target:
       kind: Certificate
       name: tienda-ca

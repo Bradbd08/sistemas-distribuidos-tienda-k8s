@@ -121,7 +121,7 @@ spec:
   passwordSecretKeyRef:
     name: mariadb-credentials
     key: api-password
-  maxUserConnections: 60
+  maxUserConnections: 80 # el HPA llega a 6 pods + 1 de surge, con un pool de 10 conexiones cada uno
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: Grant

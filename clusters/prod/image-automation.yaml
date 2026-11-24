@@ -6,10 +6,9 @@
 #
 # Antes de eso, el tag vX.Y.Z hace que el pipeline construya, escanee, firme y publique la versión.
 #
-# Los paquetes de GHCR de un repositorio privado son privados: hace falta el Secret ghcr-pull (un token
-# con read:packages) en flux-system y en tienda, cifrado con SOPS en credentials/prod/. Si haces públicos los
-# tres paquetes en GitHub (Packages > Package settings > Change visibility), el Secret no es necesario.
-# NO PROBADO todavía: necesita el clúster real y las credenciales de GHCR.
+# Los tres paquetes de GHCR son públicos (decisión del 2026-11-24): Flux y los nodos los bajan sin Secret.
+# Se hacen públicos en GitHub: Packages > Package settings > Change visibility.
+# NO PROBADO todavía: necesita el clúster real.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
@@ -18,8 +17,6 @@ metadata:
 spec:
   image: ghcr.io/bradbd08/tienda-web
   interval: 5m
-  secretRef:
-    name: ghcr-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -29,8 +26,6 @@ metadata:
 spec:
   image: ghcr.io/bradbd08/tienda-api
   interval: 5m
-  secretRef:
-    name: ghcr-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -40,8 +35,6 @@ metadata:
 spec:
   image: ghcr.io/bradbd08/tienda-worker
   interval: 5m
-  secretRef:
-    name: ghcr-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy

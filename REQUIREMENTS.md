@@ -210,7 +210,7 @@ GITHUB_TOKEN="$(gh auth token)" terraform -chdir=infra/terraform/envs/dev apply
 **Verificar:**
 
 ```bash
-flux get kustomizations      # operators, secrets, data, apps y network-policies en True (notifications suspendida)
+flux get kustomizations      # operators, secrets, data, observability, apps y network-policies en True (notifications suspendida)
 kubectl -n tienda get pods   # todo Ready
 bash scripts/verificar-ingress.sh   # lecturas por HTTP y HTTPS; toda escritura solo por HTTPS y con contraseña (docs/05-seguridad.md)
 ```

@@ -1,4 +1,4 @@
-# Producción (clúster real de 2 laptops): imágenes de GHCR, 3 réplicas mínimas y credenciales para GHCR.
+# Producción (clúster real de 2 laptops): imágenes públicas de GHCR y 3 réplicas mínimas.
 # Las etiquetas las actualiza Flux image automation (clusters/prod/image-automation.yaml) con los
 # marcadores $imagepolicy: no las edites a mano. 0.1.0 es la primera versión: se publica con
 #   git tag v0.1.0 && git push origin v0.1.0     (release.yml construye y firma las imágenes)
@@ -24,18 +24,3 @@ patches:
       - op: replace
         path: /spec/minReplicas
         value: 3
-  # Los paquetes de GHCR son privados: los pods los bajan con el Secret ghcr-pull (namespace tienda).
-  - target:
-      kind: Deployment
-    patch: |-
-      - op: add
-        path: /spec/template/spec/imagePullSecrets
-        value:
-          - name: ghcr-pull
-  - target:
-      kind: Job
-    patch: |-
-      - op: add
-        path: /spec/template/spec/imagePullSecrets
-        value:
-          - name: ghcr-pull

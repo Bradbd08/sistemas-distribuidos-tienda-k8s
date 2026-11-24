@@ -1,9 +1,11 @@
 name: CI
 
-# En cada pull request: lint, build de las imágenes, Trivy, validación de Terraform y de los manifiestos.
+# En cada pull request y en cada push a main: lint, build de las imágenes, Trivy, validación de Terraform y de los manifiestos.
 # Las acciones están fijadas por SHA de commit (el comentario dice la versión). Dependabot las actualiza.
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -77,7 +79,7 @@ jobs:
           schemas='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
           check() { kubeconform -strict -summary -kubernetes-version 1.37.2 -schema-location default -schema-location "$schemas" -ignore-missing-schemas "$@"; }
           for d in deploy/overlays/dev deploy/overlays/prod deploy/platform/operators deploy/platform/data \
-                   deploy/platform/network-policies deploy/platform/notifications; do
+                   deploy/platform/network-policies deploy/platform/notifications deploy/platform/observability; do
             echo "== $d"
             kubectl kustomize "$d" | check
           done

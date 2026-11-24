@@ -12,7 +12,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.301.1",
     "@opentelemetry/instrumentation": "^0.301.1",
     "@opentelemetry/instrumentation-amqplib": "^0.72.0",
-    "@opentelemetry/instrumentation-http": "^0.301.1",
+    "@opentelemetry/instrumentation-http": "^0.301.2",
     "@opentelemetry/instrumentation-mongodb": "^0.78.0",
     "@opentelemetry/instrumentation-mysql2": "^0.71.0",
     "@opentelemetry/instrumentation-redis": "^0.73.0",

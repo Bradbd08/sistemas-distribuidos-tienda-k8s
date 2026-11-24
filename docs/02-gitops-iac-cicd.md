@@ -37,7 +37,7 @@ estado vive dentro del clúster, así que `prod-nodes` es una raíz aparte con e
 
 ## FluxCD (`clusters/<entorno>`)
 
-Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` → `apps` → `network-policies` (cada una espera a las que necesita). `notifications` depende de `apps` y está suspendida hasta tener su token.
+Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` → `apps` → `network-policies` (cada una espera a las que necesita). `notifications` depende de `apps`.
 
 | Caso de uso del plan | Cómo se resuelve |
 |---|---|

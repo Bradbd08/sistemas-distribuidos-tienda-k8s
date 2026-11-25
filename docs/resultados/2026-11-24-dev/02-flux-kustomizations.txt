@@ -1,0 +1,9 @@
+NAME            	REVISION          	SUSPENDED	READY	MESSAGE                              
+apps            	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+data            	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+flux-system     	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+network-policies	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+notifications   	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+observability   	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+operators       	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	
+secrets         	main@sha1:261d0578	False    	True 	Applied revision: main@sha1:261d0578	

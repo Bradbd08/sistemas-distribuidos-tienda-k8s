@@ -1,0 +1,2 @@
+2026-11-25T02:55:07.423Z	notifications	could not create commit status: POST https://api.github.com/repos/Bradbd08/sistemas-distribuidos-tienda-k8s/statuses/261d0578151406ad45bdb4af5db6a418a4024b17: 403 Resource not accessible by personal access token []
+2026-11-25T02:55:36.973Z	network-policies	could not create commit status: POST https://api.github.com/repos/Bradbd08/sistemas-distribuidos-tienda-k8s/statuses/261d0578151406ad45bdb4af5db6a418a4024b17: 403 Resource not accessible by personal access token []

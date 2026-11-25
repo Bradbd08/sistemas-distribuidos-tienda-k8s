@@ -1,0 +1,15 @@
+# Captura del 2026-11-24 en el clúster dev (k3d, 3 servidores en la laptop A)
+# Commit desplegado: 261d057
+2026-11-24T21:56:27-05:00
+## CPU
+CPU(s):                                   12
+CPU(s) factor de escala MHz:              76%
+CPU(s) del nodo NUMA 0:                   0-11
+## Memoria
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:            15Gi       9.0Gi       175Mi       322Mi       6.7Gi       6.3Gi
+## Docker
+Docker version 29.9.3, build 5457199aa5
+## kubectl y k3s
+Server Version: v1.37.2+k3s1
+Nombre del modelo: 12th Gen Intel(R) Core(TM) i5-1235U

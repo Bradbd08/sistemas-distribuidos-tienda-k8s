@@ -1,0 +1,39 @@
+t=0s 22:01:50
+api   Deployment/api   cpu: 4%/70%    2     6     6     13d
+web   Deployment/web   cpu: 22%/70%   2     6     6     13d
+t=10s 22:02:00
+api   Deployment/api   cpu: 823%/70%   2     6     6     13d
+web   Deployment/web   cpu: 414%/70%   2     6     6     13d
+t=20s 22:02:10
+api   Deployment/api   cpu: 1005%/70%   2     6     6     13d
+web   Deployment/web   cpu: 560%/70%    2     6     6     13d
+t=30s 22:02:20
+api   Deployment/api   cpu: 1005%/70%   2     6     6     13d
+web   Deployment/web   cpu: 560%/70%    2     6     6     13d
+t=40s 22:02:31
+api   Deployment/api   cpu: 999%/70%   2     6     6     13d
+web   Deployment/web   cpu: 576%/70%   2     6     6     13d
+t=50s 22:02:41
+api   Deployment/api   cpu: 1031%/70%   2     6     6     13d
+web   Deployment/web   cpu: 598%/70%    2     6     6     13d
+t=60s 22:02:51
+api   Deployment/api   cpu: 1031%/70%   2     6     6     13d
+web   Deployment/web   cpu: 598%/70%    2     6     6     13d
+t=70s 22:03:01
+api   Deployment/api   cpu: 1059%/70%   2     6     6     13d
+web   Deployment/web   cpu: 602%/70%    2     6     6     13d
+t=80s 22:03:11
+api   Deployment/api   cpu: 1024%/70%   2     6     6     13d
+web   Deployment/web   cpu: 617%/70%    2     6     6     13d
+t=90s 22:03:22
+api   Deployment/api   cpu: 1024%/70%   2     6     6     13d
+web   Deployment/web   cpu: 617%/70%    2     6     6     13d
+t=100s 22:03:32
+api   Deployment/api   cpu: 1024%/70%   2     6     6     13d
+web   Deployment/web   cpu: 617%/70%    2     6     6     13d
+t=110s 22:03:42
+api   Deployment/api   cpu: 1011%/70%   2     6     6     13d
+web   Deployment/web   cpu: 612%/70%    2     6     6     13d
+t=120s 22:03:52
+api   Deployment/api   cpu: 1011%/70%   2     6     6     13d
+web   Deployment/web   cpu: 612%/70%    2     6     6     13d

@@ -7,14 +7,15 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 
 # Primero solo los archivos de dependencias, para aprovechar la caché de Docker.
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml lleva la decisión sobre los scripts de instalación (allowBuilds).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
 # npm no se usa (instalamos con pnpm y arrancamos con "node"). Quitarlo elimina sus dependencias
 # empaquetadas, que son las que Trivy marcaba, y reduce la superficie de ataque.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
-COPY index.js init-db.js ./
+COPY index.js init-db.js telemetry.mjs events.mjs topology.mjs ./
 
 USER node
 

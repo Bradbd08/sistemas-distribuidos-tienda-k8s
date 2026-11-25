@@ -7,6 +7,7 @@
 | HAProxy + Keepalived (`presentation-*`) | Ingress de Traefik (viene con K3s) y Services |
 | `web1-3` (nginx) | Deployment `web` (nginx sin root), HPA de 2 a 6 réplicas |
 | `application-lb-*` + `app1-3` | Service `api` + Deployment `api`, HPA de 2 a 6 réplicas |
+| (no existía) | Deployment `worker` (2 réplicas, sin Service ni HPA) y RabbitMQ de 3 nodos |
 | `galera1-3` + `galera-lb` (HAProxy) | MariaDB Galera de 3 nodos + MaxScale (Service `maxscale`) con MariaDB Operator |
 | `mongodb` (1 nodo) | MongoDB con replica set de 3 miembros (operador MCK) |
 | `redis` (1 nodo) | Redis con 1 master, 2 réplicas y 3 Sentinel (OpsTree redis-operator) |
@@ -19,9 +20,9 @@ Se conserva la traza de la página (`X-Request-Trace`): `traefik -> web-<pod> ->
 
 | Carpeta | Contenido |
 |---|---|
-| `web/`, `application/` | Imágenes: `web/Dockerfile` (nginx sin root, plantilla con `API_UPSTREAM`), `application/Dockerfile` |
-| `deploy/platform/operators/` | Namespaces y los 3 operadores como `HelmRelease` de Flux |
-| `deploy/platform/data/` | MariaDB + MaxScale, MongoDB y Redis (recursos de los operadores) y PDB |
+| `web/`, `application/`, `worker/` | Imágenes: `web/Dockerfile` (nginx sin root, plantilla con `API_UPSTREAM`), `application/Dockerfile` y `worker/Dockerfile` (consume las colas de RabbitMQ, ver [04-mensajeria.md](04-mensajeria.md)) |
+| `deploy/platform/operators/` | Namespaces, los 3 operadores y cert-manager como `HelmRelease` de Flux, y el RabbitMQ Cluster Operator (manifiesto de la release, copiado) |
+| `deploy/platform/data/` | MariaDB + MaxScale, MongoDB, Redis y RabbitMQ (recursos de los operadores) y PDB |
 | `deploy/base/` y `deploy/overlays/{dev,prod}/` | La tienda: Deployments, Services, HPA, PDB, Job, Ingress (Kustomize) |
 | `deploy/platform/network-policies/` | Aislamiento de red |
 
@@ -39,6 +40,9 @@ Orden de despliegue: operadores, contraseñas, datos, aplicación y, al final, l
 | MaxScale como proxy de Galera | Lo pide el plan (MaxScale o ProxySQL). Su licencia es BSL: gratis para este proyecto, no es software libre |
 | Una cuenta por servicio con todos los permisos de su base | Igual que en Compose. El mínimo privilegio se hace en la fase 7 |
 | Redis solo como caché | Los datos se reconstruyen (TTL de 60 s), así que no hace falta que persistan |
+| RabbitMQ Cluster Operator fijado en la v2.21.1 y copiado a `operators/` | No hay chart oficial. Desde la v2.22.0 el operador exige cert-manager. Ya está instalado (Etapa 5), pero el operador no se sube: no hace falta y cambiaría una mensajería ya probada. Trivy no escanea ese archivo porque es de terceros |
+| Las colas se declaran desde el código, no con el Messaging Topology Operator | Ese operador exige cert-manager, que ya está (Etapa 5). Las colas ya funcionan y se probaron así: migrarlas no aporta nada |
+| RabbitMQ con 768 Mi por nodo y sin límite de CPU | El operador pide 1 CPU y 2 Gi por nodo, que la laptop no aguanta |
 
 ## Verificación (2026-11-11)
 

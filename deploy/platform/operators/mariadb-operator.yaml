@@ -43,6 +43,7 @@ spec:
   chart:
     spec:
       chart: mariadb-operator
+      # Al subir la versión, subir también la imagen de galera.initContainer en deploy/platform/data/mariadb.yaml.
       version: 26.10.2
       sourceRef:
         kind: HelmRepository

@@ -84,7 +84,7 @@ spec:
             matchLabels:
               app.kubernetes.io/name: maxscale
 ---
-# MongoDB: los miembros del replica set se hablan entre sí; solo la API y el Job de inicialización entran.
+# MongoDB: los miembros del replica set se hablan entre sí; solo la API, el worker y el Job de inicialización entran.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -106,6 +106,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: catalog-init
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: worker
       ports:
         - { protocol: TCP, port: 27017 }
   egress:

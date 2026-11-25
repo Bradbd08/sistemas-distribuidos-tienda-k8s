@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - repositories.yaml
+  - loki.yaml
+  - tempo.yaml
+  - mimir.yaml
+  - otel-gateway.yaml
+  - otel-agent.yaml
+  - grafana.yaml
+# El sidecar de Grafana carga cada llave como un tablero (etiqueta grafana_dashboard, carpeta por anotación).
+configMapGenerator:
+  - name: grafana-dashboards-tienda
+    namespace: observability
+    files:
+      - dashboards/tienda-api-red.json
+      - dashboards/tienda-cache.json
+      - dashboards/tienda-nodos-pods.json
+      - dashboards/tienda-rabbitmq.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: Tienda

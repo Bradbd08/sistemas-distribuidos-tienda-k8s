@@ -1,0 +1,4 @@
+NAME                  STATUS   ROLES                AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE           KERNEL-VERSION            CONTAINER-RUNTIME
+k3d-tienda-server-0   Ready    control-plane,etcd   13d   v1.37.2+k3s1   172.19.0.2    <none>        K3s v1.37.2+k3s1   7.3.4-3-MANJARO (amd64)   containerd://2.3.7-k3s1
+k3d-tienda-server-1   Ready    control-plane,etcd   13d   v1.37.2+k3s1   172.19.0.3    <none>        K3s v1.37.2+k3s1   7.3.4-3-MANJARO (amd64)   containerd://2.3.7-k3s1
+k3d-tienda-server-2   Ready    control-plane,etcd   13d   v1.37.2+k3s1   172.19.0.4    <none>        K3s v1.37.2+k3s1   7.3.4-3-MANJARO (amd64)   containerd://2.3.7-k3s1

@@ -1,12 +1,11 @@
-# Notificaciones de Flux a GitHub (estado del commit). Está SUSPENDIDO hasta que exista el Secret
-# flux-system/github-token. Pasos para activarlo en deploy/platform/notifications/github.yaml.
+# Notificaciones de Flux a GitHub (estado de cada commit). Usan el Secret flux-system/github-token,
+# cifrado en credentials/prod/github-token.yaml (token de solo "Commit statuses" para este repo).
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: notifications
   namespace: flux-system
 spec:
-  suspend: true
   interval: 10m
   dependsOn:
     - name: apps

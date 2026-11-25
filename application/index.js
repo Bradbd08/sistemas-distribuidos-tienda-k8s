@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { MongoClient } from "mongodb";
+import { metrics } from "@opentelemetry/api";
+import { MongoClient, ObjectId } from "mongodb";
 import mysql from "mysql2/promise";
 import { createClient } from "redis";
 
@@ -10,6 +11,15 @@ const required = (name) => {
   }
   return value;
 };
+
+// RabbitMQ es opcional: solo existe RABBITMQ_URL en Kubernetes. En Docker Compose no se importa nada y la API guarda
+// las reseñas directo en MongoDB, como siempre. Guía: docs/04-mensajeria.md.
+const eventos = process.env.RABBITMQ_URL ? await import("./events.mjs") : null;
+
+// Métricas propias para el tablero de la caché. Si OpenTelemetry no está activo (Docker Compose), no hacen nada.
+const meter = metrics.getMeter("tienda-api");
+const cacheHits = meter.createCounter("catalog.cache.hits", { description: "Lecturas del catálogo servidas desde Redis" });
+const cacheMisses = meter.createCounter("catalog.cache.misses", { description: "Lecturas del catálogo que fueron a MariaDB" });
 
 const pool = mysql.createPool({
   host: required("DB_HOST"),
@@ -148,10 +158,12 @@ const start = async () => {
         trace.push("redis");
         const cached = await redis.get(productsCacheKey);
         if (cached) {
+          cacheHits.add(1);
           trace.push("cache hit");
           sendJson(response, 200, JSON.parse(cached), trace);
           return;
         }
+        cacheMisses.add(1);
         trace[trace.length - 1] = "redis (cache miss)";
         let dbLabel = "galera-lb";
         try {
@@ -170,6 +182,10 @@ const start = async () => {
 
       if (request.method === "POST" && pathname === "/cache/clear") {
         const removed = await redis.del(productsCacheKey);
+        // Aviso opcional: el worker repuebla la caché. Nunca debe impedir ni retrasar de más el borrado.
+        await eventos
+          ?.publicar("catalog.changed", { scope: "products", at: new Date().toISOString() })
+          .catch((error) => console.error("catalog.changed no se publicó:", error.message));
         sendJson(
           response,
           200,
@@ -227,8 +243,22 @@ const start = async () => {
           comment,
           createdAt: new Date(),
         };
-        const result = await reviews.insertOne(review);
-        sendJson(response, 201, { id: result.insertedId.toString(), ...review }, [...trace, "mongodb (insert review)"]);
+        // Con RabbitMQ la reseña se encola y el worker la guarda (202). Si no hay RabbitMQ o falla, se guarda aquí (201).
+        // El _id se crea antes de publicar: si el mensaje llegara tarde tras un fallo, el worker ve la clave
+        // duplicada y lo da por procesado.
+        const _id = new ObjectId();
+        if (eventos) {
+          try {
+            await eventos.publicar("reviews.created", { id: _id.toString(), ...review });
+            sendJson(response, 202, { id: _id.toString(), ...review, status: "queued" }, [...trace, "rabbitmq (reviews.created)"]);
+            return;
+          } catch (error) {
+            console.error("RabbitMQ no disponible; la reseña se guarda directo en MongoDB:", error.message);
+            trace.push("rabbitmq (no disponible)");
+          }
+        }
+        await reviews.insertOne({ _id, ...review });
+        sendJson(response, 201, { id: _id.toString(), ...review }, [...trace, "mongodb (insert review)"]);
         return;
       }
 
@@ -257,7 +287,7 @@ const start = async () => {
   const shutdown = () => {
     shuttingDown = true;
     server.close(() => {
-      void Promise.all([pool.end(), mongo.close(), redis.quit()]).then(() => process.exit(0));
+      void Promise.all([pool.end(), mongo.close(), redis.quit(), eventos?.cerrar()]).then(() => process.exit(0));
     });
   };
   process.on("SIGINT", shutdown);

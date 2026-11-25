@@ -1,0 +1,73 @@
+# TLS del ingress con cert-manager (Etapa 5): una CA propia firma el certificado de la tienda.
+#   Issuer autofirmado -> Certificate tienda-ca (Secret tienda-ca) -> Issuer tienda-ca -> Certificate tienda-tls (Secret tienda-tls)
+# Traefik usa el Secret tienda-tls (ver tienda-escrituras en ingress.yaml). Para confiar en la CA: docs/05-seguridad.md.
+# Los Secrets los crea cert-manager en el clúster: no van a git. La clave de la CA (tienda-ca) no debe salir del clúster.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: autofirmado
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tienda-ca
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  isCA: true
+  commonName: tienda-ca
+  secretName: tienda-ca
+  duration: 87600h # 10 años. Se importa una vez por clúster: si se recrea el clúster o se borra el Secret, sale una CA nueva
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Never # al renovarse conserva la clave, y lo que ya confía en la CA sigue confiando
+  # Esta CA solo puede firmar nombres locales: si su clave se filtrara, no serviría para suplantar otros sitios en un
+  # navegador que la haya importado. En prod, deploy/overlays/prod le agrega la IP de Tailscale de la laptop A.
+  nameConstraints:
+    critical: true
+    permitted:
+      dnsDomains:
+        - localhost
+      ipRanges:
+        - 127.0.0.0/8
+        - ::1/128
+  issuerRef:
+    name: autofirmado
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: tienda-ca
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  ca:
+    secretName: tienda-ca
+---
+# Dura 90 días (el valor por defecto) y cert-manager lo renueva solo 30 días antes de que venza.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tienda-tls
+  labels:
+    app.kubernetes.io/part-of: tienda
+spec:
+  secretName: tienda-tls
+  # Aquí solo localhost (k3d). En prod, deploy/overlays/prod agrega la IP de Tailscale de la laptop A y un TLSStore,
+  # porque por IP el cliente no manda SNI y Traefik serviría su certificado por defecto.
+  dnsNames:
+    - localhost
+  # Sin "usages", cert-manager no agrega server auth y macOS marca el certificado como no confiable.
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: tienda-ca
+    kind: Issuer

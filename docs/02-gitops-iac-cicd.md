@@ -7,13 +7,15 @@ cambio -> rama -> pull request -> CI (ci.yml) -> merge a main -> Flux de dev des
                                                       |
                                     release.yml: imágenes a GHCR, Trivy, cosign, SBOM
                                                       |
-                 tag vX.Y.Z -> imágenes X.Y.Z -> Flux image automation (prod) escribe la etiqueta en la rama release
+                 tag vX.Y.Z -> imágenes X.Y.Z -> Flux image automation (prod) escribe la etiqueta en flux-image-updates
+                                                      |
+                                  pull request flux-image-updates -> release (aprobación = puerta de promoción)
 ```
 
 | Entorno | Clúster | Rama que sigue Flux | Imágenes |
 |---|---|---|---|
 | dev | k3d `tienda` (3 servidores con etcd) | `main` | registro local `tienda-registry:5000` (etiqueta `dev`) |
-| prod | las dos laptops (K3s real) | `release` (se llega con un pull request de `main`) | GHCR `ghcr.io/bradbd08/tienda-{web,api}` |
+| prod | las dos laptops (K3s real) | `release`, protegida: solo entra lo aprobado por pull request | GHCR `ghcr.io/bradbd08/tienda-{web,api,worker}` |
 
 ## Terraform (`infra/terraform`)
 
@@ -35,17 +37,17 @@ estado vive dentro del clúster, así que `prod-nodes` es una raíz aparte con e
 
 ## FluxCD (`clusters/<entorno>`)
 
-Cuatro capas con `dependsOn`: `operators`, `secrets`, `data`, `apps` y `network-policies` (cada una espera a la anterior).
+Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` → `apps` → `network-policies` (cada una espera a las que necesita). `notifications` depende de `apps`.
 
 | Caso de uso del plan | Cómo se resuelve |
 |---|---|
 | Arranque del clúster | Terraform instala Flux y lo apunta a `clusters/<entorno>` |
-| Promoción entre entornos | dev sigue `main`; prod sigue `release`, y a `release` solo se llega por pull request |
+| Promoción entre entornos | dev sigue `main`; prod sigue `release` (protegida: pull request con 1 aprobación; el dueño puede saltarla). La promoción es un pull request a `release`, de `main` (manifiestos) o de `flux-image-updates` (etiquetas de imagen) |
 | Orden de dependencias | `dependsOn` con `wait: true` |
 | Corrección de deriva y rollback | Flux revierte cambios manuales; el rollback es `git revert` |
 | Secretos | SOPS con age: `credentials/<entorno>/*.yaml` cifrado; Flux descifra con `flux-system/sops-age` |
 | Automatización de imágenes | `clusters/prod/image-automation.yaml` (ver límites) |
-| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. Suspendido hasta tener el token |
+| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. El token está cifrado en `credentials/<entorno>/github-token.yaml` |
 
 **Protección de datos:** las capas `data` y `secrets` no usan `prune`, tienen `deletionPolicy: Orphan`, y los namespaces y las bases de
 datos llevan `prune: disabled`. Borrar un archivo del repositorio no borra una base de datos ni sus volúmenes.
@@ -54,10 +56,10 @@ datos llevan `prune: disabled`. Borrar un archivo del repositorio no borra una b
 
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
-| `ci.yml` | Pull request | shellcheck, actionlint, sintaxis de la API, kubeconform en cada capa, Secrets cifrados, checkov, Trivy (config e imágenes), Terraform (fmt, validate, tflint, pruebas, checkov) |
+| `ci.yml` | Pull request | shellcheck, actionlint, sintaxis de la API y del worker, pruebas del worker, `topology.mjs` idéntico en API y worker, kubeconform en cada capa, Secrets cifrados, checkov, Trivy (config y las 3 imágenes: web, API y worker), Terraform (fmt, validate, tflint, pruebas, checkov) |
 | `release.yml` | `main` (si cambian las imágenes) y tags `vX.Y.Z` | Construye y sube a GHCR con etiqueta `sha-<commit>` (y `X.Y.Z` en tags), Trivy, firma con cosign sin llaves y adjunta el SBOM |
 | `terraform.yml` | Pull request a `infra/` | `plan` y `apply` manual, solo con runner autoalojado (ver límites) |
-| `dependabot.yml` | Semanal | Acciones, imágenes base, pnpm y providers de Terraform |
+| `dependabot.yml` | Semanal | Acciones, imágenes base (web, API y worker), pnpm (API y worker) y providers de Terraform |
 
 Todas las acciones están fijadas por SHA de commit. Los permisos son mínimos por job (`packages: write` y `id-token: write` solo en el release).
 
@@ -70,7 +72,7 @@ secretos de variables de entorno, 12-factor) y `CKV_K8S_43` (sin digest: dev usa
 |---|---|
 | `terraform plan/apply` en CI | El estado vive dentro de los clústeres y Terraform necesita permisos de administrador del repo: los runners de GitHub no pueden. Los jobs están escritos pero solo corren con un runner autoalojado en la laptop A y `TF_SELF_HOSTED=true`. **No probado** |
 | Image automation | Escrita y validada con kubeconform, pero **no probada**: necesita el clúster real y credenciales de GHCR (los paquetes de un repo privado son privados) |
-| Aprobación manual y protección de ramas | Dependen del plan de GitHub para repos privados |
-| Pruebas unitarias | La API no tiene todavía; el CI solo revisa que compile |
+| Aprobación manual en `terraform.yml` | Los *environments* con revisores obligatorios dependen del plan de GitHub para repos privados |
+| Pruebas | La API no tiene pruebas unitarias; el CI solo revisa que compile. El worker tiene pruebas de sus manejadores (`node --test`), sin broker real: RabbitMQ no se prueba en CI |
 | Firma con cosign | Sin llaves: la identidad del workflow (repositorio y commit) queda en el registro público Rekor |
-| Clave age | Está en `~/.config/sops/age/keys.txt` de la laptop A. Si se pierde no se pueden editar los Secrets cifrados (se regeneran): hay que respaldarla |
+| Claves age | Una por entorno, en la laptop A: dev en `~/.config/sops/age/keys.txt` y prod en `~/.config/sops/age/prod.txt` (la de dev no descifra prod). Si se pierde una, no se pueden editar los Secrets cifrados de su entorno (se regeneran): hay que respaldar las dos |

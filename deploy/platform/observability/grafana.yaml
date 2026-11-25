@@ -1,0 +1,353 @@
+# Grafana: tableros y alertas sobre Mimir (métricas), Loki (logs) y Tempo (trazas).
+# Entrada: http://grafana.localhost:8081 (k3d). Usuario "admin"; la contraseña está en el Secret grafana-admin
+# (credentials/dev/grafana-admin.yaml, cifrado con SOPS):
+#   kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d
+# Los tableros son ConfigMaps con la etiqueta grafana_dashboard=1 (carpeta dashboards/).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: grafana
+  targetNamespace: observability
+  dependsOn:
+    - name: loki
+    - name: tempo
+  chart:
+    spec:
+      chart: grafana
+      version: 10.5.15
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+  install:
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: grafana
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 192Mi }
+      limits: { memory: 512Mi }
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      annotations:
+        # Más alta que la de las rutas de escrituras de la tienda (100, sin host): sin esto, los POST de Grafana
+        # (por ejemplo /api/ds/query) pedían la contraseña de la tienda (hallazgo 25).
+        traefik.ingress.kubernetes.io/router.priority: "200"
+      hosts:
+        - grafana.localhost
+      path: /
+      pathType: Prefix
+    grafana.ini:
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+      unified_alerting:
+        enabled: true
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        # Busca tableros en todos los namespaces (los de la app viven junto a la app).
+        searchNamespace: ALL
+        folderAnnotation: grafana_folder
+        provider:
+          foldersFromFilesStructure: true
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Mimir
+            uid: mimir
+            type: prometheus
+            access: proxy
+            url: http://mimir.observability:9009/prometheus
+            isDefault: true
+            jsonData:
+              httpMethod: POST
+              # Las métricas OTLP se guardan cada 60 s; con 15 s, rate_interval queda en 1 min y los rate() salen vacíos.
+              timeInterval: 60s
+          - name: Loki
+            uid: loki
+            type: loki
+            access: proxy
+            url: http://loki.observability:3100
+            jsonData:
+              # Un trace_id en el log abre la traza en Tempo.
+              derivedFields:
+                - name: trace_id
+                  matcherRegex: '"?trace_?[iI]d"?[=:]\s*"?([0-9a-f]{32})'
+                  url: "$${__value.raw}"
+                  datasourceUid: tempo
+          - name: Tempo
+            uid: tempo
+            type: tempo
+            access: proxy
+            url: http://tempo.observability:3200
+            jsonData:
+              # De una traza se saltan a los logs del mismo pod y a las métricas del servicio.
+              tracesToLogsV2:
+                datasourceUid: loki
+                spanStartTimeShift: -5m
+                spanEndTimeShift: 5m
+                filterByTraceID: false
+                filterBySpanID: false
+                customQuery: true
+                query: '{k8s_pod_name="$${__span.tags["k8s.pod.name"]}"}'
+              tracesToMetrics:
+                datasourceUid: mimir
+              nodeGraph:
+                enabled: true
+    # Alertas SLO de la API (provisioning de archivos). Sin contactos configurados: se ven en Alerting > Alert rules.
+    alerting:
+      rules.yaml:
+        # shortcut: sin tráfico no hay datos y la regla queda en OK, así que una caída total no dispara; pasar a una regla de ausencia cuando haya pruebas sintéticas
+        apiVersion: 1
+        groups:
+          - orgId: 1
+            name: tienda-slo
+            folder: Tienda
+            interval: 1m
+            rules:
+              - uid: tienda-api-errores-5xx
+                title: "API: más de 0,5 % de errores 5xx"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: '(sum(rate(http_server_request_duration_count{job="tienda/tienda-api",http_response_status_code=~"5.."}[5m])) or vector(0)) / sum(rate(http_server_request_duration_count{job="tienda/tienda-api"}[5m]))'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0.005
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: La API de la tienda supera el 0,5 % de respuestas 5xx
+                  description: La razón de respuestas 5xx sobre el total de peticiones de la API en los últimos 5 minutos lleva más de 5 minutos por encima del 0,5 %, el límite del SLO de disponibilidad del 99,5 %.
+                labels:
+                  severity: critical
+                  service: tienda-api
+              - uid: tienda-api-latencia-p95
+                title: "API: p95 de latencia mayor a 500 ms"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{job="tienda/tienda-api"}[5m])))'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0.5
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: El p95 de latencia de la API de la tienda supera los 500 ms
+                  description: El percentil 95 de la duración de las peticiones de la API en los últimos 5 minutos lleva más de 5 minutos por encima de 0,5 segundos.
+                labels:
+                  severity: warning
+                  service: tienda-api
+          # shortcut: el retraso de los consumidores se aproxima con la profundidad y el número de consumidores porque RabbitMQ no expone la edad del mensaje más viejo; pasar a una alerta por edad si se mide con el worker
+          - orgId: 1
+            name: tienda-colas
+            folder: Tienda
+            interval: 1m
+            rules:
+              - uid: tienda-rabbitmq-dlq
+                title: "RabbitMQ: hay mensajes en reviews.dlq"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_messages_ready{queue="reviews.dlq"}) or vector(0)'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 0
+                noDataState: OK
+                execErrState: Error
+                for: 1m
+                annotations:
+                  summary: Hay mensajes en la cola de mensajes fallidos reviews.dlq
+                  description: La cola reviews.dlq tiene al menos un mensaje listo desde hace más de 1 minuto. Son reseñas que el worker rechazó o no pudo procesar tras agotar los reintentos; hay que revisar el mensaje y los registros del worker, y reprocesarlo o descartarlo.
+                labels:
+                  severity: warning
+                  service: rabbitmq
+              - uid: tienda-rabbitmq-profundidad
+                title: "RabbitMQ: más de 100 mensajes esperando en reviews.created"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_messages_ready{queue="reviews.created"}) or vector(0)'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: gt
+                            params:
+                              - 100
+                noDataState: OK
+                execErrState: Error
+                for: 5m
+                annotations:
+                  summary: La cola reviews.created acumula más de 100 mensajes listos
+                  description: La cola reviews.created lleva más de 5 minutos con más de 100 mensajes esperando a ser consumidos. El worker no da abasto o se detuvo; hay que revisar su estado y la tasa de consumo.
+                labels:
+                  severity: warning
+                  service: rabbitmq
+              - uid: tienda-rabbitmq-sin-consumidores
+                title: "RabbitMQ: reviews.created sin consumidores"
+                condition: C
+                data:
+                  - refId: A
+                    relativeTimeRange:
+                      from: 600
+                      to: 0
+                    datasourceUid: mimir
+                    model:
+                      refId: A
+                      expr: 'max(rabbitmq_queue_consumers{queue="reviews.created"})'
+                      instant: true
+                      range: false
+                      intervalMs: 1000
+                      maxDataPoints: 43200
+                  - refId: B
+                    datasourceUid: __expr__
+                    model:
+                      refId: B
+                      type: reduce
+                      expression: A
+                      reducer: last
+                      settings:
+                        mode: dropNN
+                  - refId: C
+                    datasourceUid: __expr__
+                    model:
+                      refId: C
+                      type: threshold
+                      expression: B
+                      conditions:
+                        - evaluator:
+                            type: lt
+                            params:
+                              - 1
+                noDataState: Alerting
+                execErrState: Error
+                for: 2m
+                annotations:
+                  summary: Nadie está consumiendo la cola reviews.created
+                  description: La cola reviews.created lleva más de 2 minutos sin consumidores, o sin que RabbitMQ publique la métrica. Las reseñas nuevas se acumulan sin procesarse; hay que revisar que el worker esté en marcha y conectado.
+                labels:
+                  severity: critical
+                  service: rabbitmq

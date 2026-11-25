@@ -6,17 +6,20 @@ updates:
     schedule:
       interval: weekly
 
-  # Imágenes base de web y API.
+  # Imágenes base de web, API y worker.
   - package-ecosystem: docker
     directories:
       - /web
       - /application
+      - /worker
     schedule:
       interval: weekly
 
-  # Dependencias de la API (pnpm).
+  # Dependencias de la API y del worker (pnpm).
   - package-ecosystem: npm
-    directory: /application
+    directories:
+      - /application
+      - /worker
     schedule:
       interval: weekly
 

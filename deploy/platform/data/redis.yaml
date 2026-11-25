@@ -19,9 +19,18 @@ spec:
   pdb:
     enabled: true
     maxUnavailable: 1
+  # Pod Security restricted (Etapa 5). La imagen ya corre como el usuario redis (1000); falta declararlo, quitar la
+  # escalada de privilegios y las capacidades, y usar el perfil seccomp por defecto.
   podSecurityContext:
+    runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   kubernetesConfig:
     image: quay.io/opstree/redis:v7.0.15
     imagePullPolicy: IfNotPresent
@@ -39,6 +48,16 @@ spec:
     size: 3
     image: quay.io/opstree/redis-sentinel:v7.0.15
     imagePullPolicy: IfNotPresent
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
     resources:
       requests: { cpu: 25m, memory: 32Mi }
       limits: { memory: 96Mi }

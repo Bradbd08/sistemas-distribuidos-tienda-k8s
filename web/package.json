@@ -1,0 +1,21 @@
+{
+  "name": "store-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Empaqueta el SDK de OpenTelemetry para el navegador (src/telemetry.js -> dist/telemetry.js)",
+  "scripts": {
+    "build": "esbuild src/telemetry.js --bundle --minify --format=iife --target=es2020 --outfile=dist/telemetry.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/core": "^3.1.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.301.1",
+    "@opentelemetry/instrumentation": "^0.301.1",
+    "@opentelemetry/instrumentation-fetch": "^0.301.1",
+    "@opentelemetry/resources": "^3.1.1",
+    "@opentelemetry/sdk-trace": "^3.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

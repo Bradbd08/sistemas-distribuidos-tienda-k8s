@@ -1,0 +1,22 @@
+# Observabilidad: Loki, Tempo, Mimir, Grafana y los Collectors de OpenTelemetry (namespace observability).
+# Sin prune: contiene volúmenes con métricas, logs y trazas. Depende de los operadores (namespaces) y de los Secrets
+# (la contraseña de Grafana). La app (apps) depende de esta capa porque nginx resuelve el Collector al arrancar.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 15m
+  dependsOn:
+    - name: operators
+    - name: secrets
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/platform/observability
+  prune: false
+  wait: true
+  deletionPolicy: Orphan

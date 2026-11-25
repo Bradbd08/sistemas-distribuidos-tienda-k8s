@@ -40,3 +40,9 @@ backups/
 
 # Scripts de instalación de K3s que genera infra/terraform/envs/prod-nodes (llevan IP de Tailscale).
 generated/
+
+# Dependencias de Node (se instalan con pnpm).
+node_modules/
+
+# Copias de trabajo temporales de los agentes de Claude Code.
+.claude/worktrees/

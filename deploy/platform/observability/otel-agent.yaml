@@ -1,0 +1,76 @@
+# OpenTelemetry Collector, parte 2: el AGENTE (DaemonSet, uno por nodo). Lee los logs de los contenedores de su nodo,
+# mide el kubelet (CPU y memoria de nodos y pods) y descubre métricas por anotaciones de los pods
+# (io.opentelemetry.discovery.metrics.<puerto>/enabled, scraper y config; ejemplo en data/rabbitmq.yaml).
+# Todo lo reenvía al gateway.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: otel-agent
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: otel-agent
+  targetNamespace: observability
+  dependsOn:
+    - name: otel-gateway
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      version: 0.178.3
+      sourceRef:
+        kind: HelmRepository
+        name: open-telemetry
+  install:
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: otel-agent
+    mode: daemonset
+    # También en la laptop B (taint tienda/ligero), para recoger los logs de los pods que corren ahí.
+    tolerations:
+      - key: tienda/ligero
+        operator: Exists
+        effect: NoSchedule
+    image:
+      repository: otel/opentelemetry-collector-k8s
+    presets:
+      logsCollection:
+        enabled: true
+      kubeletMetrics:
+        enabled: true
+      kubernetesAttributes:
+        enabled: true
+      annotationDiscovery:
+        metrics:
+          enabled: true
+    resources:
+      requests: { cpu: 50m, memory: 96Mi }
+      limits: { memory: 256Mi }
+    ports:
+      otlp:
+        enabled: false
+      otlp-http:
+        enabled: false
+      jaeger-compact:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      zipkin:
+        enabled: false
+    config:
+      # No anular receivers: los pipelines de logs y metrics del chart siguen usando otlp y prometheus.
+      exporters:
+        debug: null
+        otlp/gateway:
+          endpoint: otel-gateway.observability:4317
+          tls:
+            insecure: true
+      service:
+        pipelines:
+          traces: null
+          logs:
+            exporters: [otlp/gateway]
+          metrics:
+            exporters: [otlp/gateway]

@@ -1,4 +1,4 @@
-# Producción (clúster real de 2 laptops): imágenes de GHCR, 3 réplicas mínimas y credenciales para GHCR.
+# Producción (clúster real de 2 laptops): imágenes públicas de GHCR y 3 réplicas mínimas.
 # Las etiquetas las actualiza Flux image automation (clusters/prod/image-automation.yaml) con los
 # marcadores $imagepolicy: no las edites a mano. 0.1.0 es la primera versión: se publica con
 #   git tag v0.1.0 && git push origin v0.1.0     (release.yml construye y firma las imágenes)
@@ -6,6 +6,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
+  - tls-prod.yaml
 images:
   - name: tienda-web
     newName: ghcr.io/bradbd08/tienda-web # {"$imagepolicy": "flux-system:tienda-web:name"}
@@ -13,6 +14,9 @@ images:
   - name: tienda-api
     newName: ghcr.io/bradbd08/tienda-api # {"$imagepolicy": "flux-system:tienda-api:name"}
     newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-api:tag"}
+  - name: tienda-worker
+    newName: ghcr.io/bradbd08/tienda-worker # {"$imagepolicy": "flux-system:tienda-worker:name"}
+    newTag: 0.1.0 # {"$imagepolicy": "flux-system:tienda-worker:tag"}
 patches:
   # 3 réplicas mínimas (en dev son 2).
   - target:
@@ -21,18 +25,22 @@ patches:
       - op: replace
         path: /spec/minReplicas
         value: 3
-  # Los paquetes de GHCR son privados: los pods los bajan con el Secret ghcr-pull (namespace tienda).
+  # Entrada de prod: la IP de Tailscale de la laptop A. El certificado la incluye y la CA puede firmarla
+  # (su restricción de nombres solo permite localhost). El TLSStore de tls-prod.yaml lo sirve sin SNI.
   - target:
-      kind: Deployment
+      kind: Certificate
+      name: tienda-tls
     patch: |-
       - op: add
-        path: /spec/template/spec/imagePullSecrets
+        path: /spec/ipAddresses
         value:
-          - name: ghcr-pull
+          - 100.94.162.3
+  # Si cambia la IP: cámbiala en los dos parches y reemite la CA (cmctl renew -n tienda tienda-ca); cert-manager no la
+  # reemite por cambiar nameConstraints. Después hay que importar la CA nueva en cada cliente.
   - target:
-      kind: Job
+      kind: Certificate
+      name: tienda-ca
     patch: |-
       - op: add
-        path: /spec/template/spec/imagePullSecrets
-        value:
-          - name: ghcr-pull
+        path: /spec/nameConstraints/permitted/ipRanges/-
+        value: 100.94.162.3/32

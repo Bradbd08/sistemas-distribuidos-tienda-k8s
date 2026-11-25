@@ -27,6 +27,18 @@ spec:
               app.kubernetes.io/name: api
       ports:
         - { protocol: TCP, port: 8080 }
+    # Trazas de nginx (gRPC 4317) y trazas del navegador, que nginx reenvía por /otlp/ (HTTP 4318).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+              app.kubernetes.io/instance: otel-gateway
+      ports:
+        - { protocol: TCP, port: 4317 }
+        - { protocol: TCP, port: 4318 }
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -43,6 +55,10 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: web
+        # El worker repuebla la caché con GET /products/cheapest.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: worker
       ports:
         - { protocol: TCP, port: 8080 }
   egress:
@@ -64,6 +80,24 @@ spec:
               app: redis
       ports:
         - { protocol: TCP, port: 6379 }
+    # Publica reseñas y cambios del catálogo en RabbitMQ.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+      ports:
+        - { protocol: TCP, port: 5672 }
+    # Trazas y métricas OTLP/HTTP al Collector.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+              app.kubernetes.io/instance: otel-gateway
+      ports:
+        - { protocol: TCP, port: 4318 }
 ---
 # Job de inicialización: crea el esquema en MariaDB y los índices en MongoDB.
 apiVersion: networking.k8s.io/v1

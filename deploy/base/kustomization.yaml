@@ -4,7 +4,9 @@ namespace: tienda
 resources:
   - web.yaml
   - api.yaml
+  - worker.yaml
   - catalog-init.yaml
+  - tls.yaml
   - ingress.yaml
 configMapGenerator:
   # Valores no secretos de la API. Las contraseñas vienen de Secrets (ver api.yaml).

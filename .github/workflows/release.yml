@@ -10,6 +10,7 @@ on:
     paths:
       - web/**
       - application/**
+      - worker/**
       - .github/workflows/release.yml
     tags: ["v*.*.*"]
   workflow_dispatch:
@@ -37,6 +38,8 @@ jobs:
             context: web
           - name: tienda-api
             context: application
+          - name: tienda-worker
+            context: worker
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

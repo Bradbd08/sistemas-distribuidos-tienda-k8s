@@ -1,0 +1,72 @@
+# RabbitMQ: 3 nodos con colas de quórum para la mensajería asíncrona de la tienda (Etapa 4).
+# El operador crea el Secret rabbitmq-default-user (usuario, contraseña y connection_string) y el Service rabbitmq
+# (AMQP 5672, administración 15672 y métricas de Prometheus 15692). La administración solo se alcanza dentro del
+# clúster: kubectl -n tienda port-forward svc/rabbitmq 15672
+# Las colas no se declaran aquí: las declara el código del API y del worker (el Messaging Topology Operator exige cert-manager; ya funcionan así y no se migran).
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq
+  namespace: tienda
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+spec:
+  replicas: 3
+  image: rabbitmq:4.3.7-management
+  # El valor por defecto del operador es una semana.
+  terminationGracePeriodSeconds: 120
+  delayStartSeconds: 10
+  persistence:
+    storageClassName: local-path
+    storage: 1Gi
+  # El operador pide 1 CPU y 2 Gi por nodo; la laptop no lo aguanta. Sin límite de CPU, como el resto del repo.
+  resources:
+    requests: { cpu: 100m, memory: 768Mi }
+    limits: { memory: 768Mi }
+  rabbitmq:
+    additionalConfig: |
+      default_queue_type = quorum
+      prometheus.return_per_object_metrics = true
+      collect_statistics_interval = 30000
+      raft.wal_max_size_bytes = 32000000
+  # Los nodos k3d no tienen etiqueta de zona, así que el operador no reparte los pods; se pide por nombre de nodo.
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: rabbitmq
+  override:
+    statefulSet:
+      spec:
+        template:
+          metadata:
+            annotations:
+              # El agente de OpenTelemetry (otel-agent.yaml) descubre estas métricas con anotaciones
+              # io.opentelemetry.discovery.metrics.<puerto>/...; las prometheus.io/* no las lee.
+              # Solo el puerto 15692: sin el puerto en la anotación, intentaría raspar todos los puertos del pod.
+              io.opentelemetry.discovery.metrics.15692/enabled: "true"
+              io.opentelemetry.discovery.metrics.15692/scraper: prometheus
+              io.opentelemetry.discovery.metrics.15692/config: |
+                config:
+                  scrape_configs:
+                    - job_name: rabbitmq
+                      scrape_interval: 30s
+                      metrics_path: /metrics
+                      static_configs:
+                        - targets: ["`endpoint`"]
+---
+# El operador no crea PDB: con 3 nodos solo uno puede caer a la vez (si no, las colas de quórum pierden la mayoría).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rabbitmq
+  namespace: tienda
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq

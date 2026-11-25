@@ -1,0 +1,3 @@
+NAMESPACE   NAME   REFERENCE        TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+tienda      api    Deployment/api   cpu: 950%/70%   2         6         6          13d
+tienda      web    Deployment/web   cpu: 594%/70%   2         6         6          13d

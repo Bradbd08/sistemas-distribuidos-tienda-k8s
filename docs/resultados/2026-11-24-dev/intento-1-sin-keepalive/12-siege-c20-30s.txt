@@ -1,0 +1,21 @@
++ siege -c 20 -t 30S -b -f urls.txt
+http://localhost:8081/
+http://localhost:8081/api/health
+http://localhost:8081/api/products/cheapest
+** SIEGE 4.1.6
+** Preparing 20 concurrent users for battle.
+The server is now under siege...
+siege aborted due to excessive socket failure; you can change the failure threshold in $HOME/.siegerc
+Transactions:		       62827 hits
+Availability:		       98.39 %
+Elapsed time:		       26.97 secs
+Data transferred:	      730.89 MB
+Response time:		        0.01 secs
+Transaction rate:	     2329.51 trans/sec
+Throughput:		       27.10 MB/sec
+Concurrency:		       19.16
+Successful transactions:       62827
+Failed transactions:	        1028
+Longest transaction:	        2.00
+Shortest transaction:	        0.00
+(Se omitieron 62827 líneas de transacciones por tamaño. 62826 respuestas 200; )

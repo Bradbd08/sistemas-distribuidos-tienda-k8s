@@ -1,0 +1,57 @@
+NAMESPACE          NAME                                                READY   STATUS    RESTARTS         AGE     IP            NODE                  NOMINATED NODE   READINESS GATES
+cert-manager       cert-manager-cainjector-c58b6d94c-92jxt             1/1     Running   1 (4m31s ago)    3h55m   10.42.0.194   k3d-tienda-server-0   <none>           <none>
+cert-manager       cert-manager-cb7697779-vx677                        1/1     Running   1 (4m31s ago)    3h55m   10.42.0.203   k3d-tienda-server-0   <none>           <none>
+cert-manager       cert-manager-webhook-78bfc98b79-2cb8l               1/1     Running   1 (4m31s ago)    3h55m   10.42.0.207   k3d-tienda-server-0   <none>           <none>
+flux-system        helm-controller-7879bfd657-5p7pm                    1/1     Running   1 (4m31s ago)    3h55m   10.42.0.191   k3d-tienda-server-0   <none>           <none>
+flux-system        image-automation-controller-75bf46ff4d-qln75        1/1     Running   1 (4m31s ago)    3h55m   10.42.0.196   k3d-tienda-server-0   <none>           <none>
+flux-system        image-reflector-controller-bf59f4bdb-4c4bj          1/1     Running   1 (4m31s ago)    3h55m   10.42.0.199   k3d-tienda-server-0   <none>           <none>
+flux-system        kustomize-controller-6cbbc9f58d-swlns               1/1     Running   1 (4m31s ago)    3h55m   10.42.0.201   k3d-tienda-server-0   <none>           <none>
+flux-system        notification-controller-7f7c8ccffc-8r56k            1/1     Running   1 (4m31s ago)    3h55m   10.42.0.192   k3d-tienda-server-0   <none>           <none>
+flux-system        source-controller-648554b6c9-ht4lr                  1/1     Running   1 (4m31s ago)    3h55m   10.42.0.204   k3d-tienda-server-0   <none>           <none>
+kube-system        coredns-577d995dff-zz4vc                            1/1     Running   0                4m4s    10.42.1.130   k3d-tienda-server-1   <none>           <none>
+kube-system        local-path-provisioner-56c6584955-cqqr7             1/1     Running   0                4m4s    10.42.1.134   k3d-tienda-server-1   <none>           <none>
+kube-system        metrics-server-778c4649b4-gdr9r                     1/1     Running   1 (4m31s ago)    3h55m   10.42.0.193   k3d-tienda-server-0   <none>           <none>
+kube-system        svclb-traefik-ff7774a0-kwbfr                        2/2     Running   14 (4m29s ago)   13d     10.42.2.91    k3d-tienda-server-2   <none>           <none>
+kube-system        svclb-traefik-ff7774a0-lwh2v                        2/2     Running   8 (4m29s ago)    13d     10.42.1.129   k3d-tienda-server-1   <none>           <none>
+kube-system        svclb-traefik-ff7774a0-t8ggm                        2/2     Running   10 (4m31s ago)   13d     10.42.0.211   k3d-tienda-server-0   <none>           <none>
+kube-system        traefik-68df944ff7-lsf4l                            1/1     Running   1 (4m31s ago)    3h55m   10.42.0.197   k3d-tienda-server-0   <none>           <none>
+mariadb-operator   mariadb-operator-65755758b6-24pzm                   1/1     Running   0                4m4s    10.42.1.139   k3d-tienda-server-1   <none>           <none>
+mariadb-operator   mariadb-operator-cert-controller-7f66b89b68-qv8qv   1/1     Running   0                4m4s    10.42.1.133   k3d-tienda-server-1   <none>           <none>
+mariadb-operator   mariadb-operator-webhook-6678b97fc6-6crj5           1/1     Running   0                4m4s    10.42.1.137   k3d-tienda-server-1   <none>           <none>
+observability      grafana-844596c79c-9nmww                            2/2     Running   0                3h55m   10.42.2.94    k3d-tienda-server-2   <none>           <none>
+observability      loki-0                                              2/2     Running   0                4m4s    10.42.1.147   k3d-tienda-server-1   <none>           <none>
+observability      mimir-0                                             1/1     Running   0                3h55m   10.42.2.93    k3d-tienda-server-2   <none>           <none>
+observability      otel-agent-agent-4976x                              1/1     Running   1 (4m29s ago)    4h28m   10.42.2.90    k3d-tienda-server-2   <none>           <none>
+observability      otel-agent-agent-f25nb                              1/1     Running   1 (4m29s ago)    4h28m   10.42.1.128   k3d-tienda-server-1   <none>           <none>
+observability      otel-agent-agent-pmkr8                              1/1     Running   1 (4m31s ago)    4h28m   10.42.0.190   k3d-tienda-server-0   <none>           <none>
+observability      otel-gateway-94594755c-zdb6q                        1/1     Running   0                4m4s    10.42.1.140   k3d-tienda-server-1   <none>           <none>
+observability      tempo-0                                             1/1     Running   0                4m4s    10.42.1.142   k3d-tienda-server-1   <none>           <none>
+rabbitmq-system    rabbitmq-cluster-operator-69576dbdff-jgv6m          1/1     Running   1 (4m31s ago)    3h55m   10.42.0.205   k3d-tienda-server-0   <none>           <none>
+redis-operator     redis-operator-5fcf754d8d-gzzv7                     1/1     Running   0                4m4s    10.42.1.135   k3d-tienda-server-1   <none>           <none>
+tienda             api-85ddf97bd4-4br2n                                1/1     Running   0                3m49s   10.42.2.99    k3d-tienda-server-2   <none>           <none>
+tienda             api-85ddf97bd4-d6wrt                                1/1     Running   0                3m49s   10.42.2.100   k3d-tienda-server-2   <none>           <none>
+tienda             api-85ddf97bd4-k7gtl                                1/1     Running   1 (4m31s ago)    4h26m   10.42.0.198   k3d-tienda-server-0   <none>           <none>
+tienda             api-85ddf97bd4-mf7g8                                1/1     Running   0                3m34s   10.42.1.148   k3d-tienda-server-1   <none>           <none>
+tienda             api-85ddf97bd4-zk8df                                1/1     Running   0                4m4s    10.42.1.132   k3d-tienda-server-1   <none>           <none>
+tienda             mariadb-0                                           2/2     Running   2 (4m31s ago)    4h28m   10.42.0.200   k3d-tienda-server-0   <none>           <none>
+tienda             mariadb-1                                           2/2     Running   0                3h55m   10.42.2.95    k3d-tienda-server-2   <none>           <none>
+tienda             mariadb-2                                           2/2     Running   0                4m4s    10.42.1.141   k3d-tienda-server-1   <none>           <none>
+tienda             maxscale-0                                          1/1     Running   1 (4m31s ago)    4h30m   10.42.0.189   k3d-tienda-server-0   <none>           <none>
+tienda             maxscale-1                                          1/1     Running   0                4m4s    10.42.1.146   k3d-tienda-server-1   <none>           <none>
+tienda             mongodb-0                                           2/2     Running   0                4m4s    10.42.2.96    k3d-tienda-server-2   <none>           <none>
+tienda             mongodb-1                                           2/2     Running   0                3m20s   10.42.1.149   k3d-tienda-server-1   <none>           <none>
+tienda             mongodb-2                                           2/2     Running   2 (4m31s ago)    4h30m   10.42.0.210   k3d-tienda-server-0   <none>           <none>
+tienda             mongodb-kubernetes-operator-67769b884b-6br9g        1/1     Running   0                4m4s    10.42.1.131   k3d-tienda-server-1   <none>           <none>
+tienda             rabbitmq-server-0                                   1/1     Running   1 (4m31s ago)    4h30m   10.42.0.209   k3d-tienda-server-0   <none>           <none>
+tienda             rabbitmq-server-1                                   1/1     Running   0                4m4s    10.42.1.145   k3d-tienda-server-1   <none>           <none>
+tienda             rabbitmq-server-2                                   1/1     Running   0                4m4s    10.42.2.97    k3d-tienda-server-2   <none>           <none>
+tienda             redis-0                                             1/1     Running   0                4m4s    10.42.1.144   k3d-tienda-server-1   <none>           <none>
+tienda             redis-1                                             1/1     Running   1 (4m31s ago)    4h30m   10.42.0.206   k3d-tienda-server-0   <none>           <none>
+tienda             redis-2                                             1/1     Running   0                3h55m   10.42.2.92    k3d-tienda-server-2   <none>           <none>
+tienda             redis-s-0                                           1/1     Running   0                4m4s    10.42.1.143   k3d-tienda-server-1   <none>           <none>
+tienda             redis-s-1                                           1/1     Running   1 (4m31s ago)    3h55m   10.42.0.208   k3d-tienda-server-0   <none>           <none>
+tienda             redis-s-2                                           1/1     Running   0                4m1s    10.42.2.98    k3d-tienda-server-2   <none>           <none>
+tienda             web-7886f7bf9b-cv846                                1/1     Running   0                4m4s    10.42.1.136   k3d-tienda-server-1   <none>           <none>
+tienda             web-7886f7bf9b-g967l                                1/1     Running   2 (4m12s ago)    3h55m   10.42.0.195   k3d-tienda-server-0   <none>           <none>
+tienda             worker-6f98f4cdf7-9djgv                             1/1     Running   0                4m4s    10.42.1.138   k3d-tienda-server-1   <none>           <none>
+tienda             worker-6f98f4cdf7-kjz2q                             1/1     Running   2 (4m31s ago)    4h26m   10.42.0.202   k3d-tienda-server-0   <none>           <none>

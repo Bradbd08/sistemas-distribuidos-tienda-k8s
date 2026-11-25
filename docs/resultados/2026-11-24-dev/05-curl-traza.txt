@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Wed, 25 Nov 2026 02:56:27 GMT
+Server: nginx/1.31.7
+X-Request-Trace: traefik -> web-7886f7bf9b-g967l -> service/api -> api-85ddf97bd4-4br2n -> redis -> cache hit
+Transfer-Encoding: chunked
+

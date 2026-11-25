@@ -1,0 +1,4 @@
+NAME                  CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
+k3d-tienda-server-0   197m         1%       2892Mi          18%         
+k3d-tienda-server-1   179m         1%       2795Mi          17%         
+k3d-tienda-server-2   156m         1%       2202Mi          14%         

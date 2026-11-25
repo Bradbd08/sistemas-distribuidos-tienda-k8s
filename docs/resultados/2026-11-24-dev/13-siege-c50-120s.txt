@@ -1,0 +1,21 @@
++ siege -R siege.conf (connection = keep-alive) -c 50 -t 120S -b -f urls.txt
+http://localhost:8081/
+http://localhost:8081/api/health
+http://localhost:8081/api/products/cheapest
+** SIEGE 4.1.6
+** Preparing 50 concurrent users for battle.
+The server is now under siege...
+Lifting the server siege...
+Transactions:		      441465 hits
+Availability:		      100.00 %
+Elapsed time:		      120.36 secs
+Data transferred:	     5162.19 MB
+Response time:		        0.01 secs
+Transaction rate:	     3667.87 trans/sec
+Throughput:		       42.89 MB/sec
+Concurrency:		       49.12
+Successful transactions:      441465
+Failed transactions:	           0
+Longest transaction:	        0.14
+Shortest transaction:	        0.00
+(Se omitieron 441465 líneas de transacciones por tamaño. 441465 respuestas 200; )

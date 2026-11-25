@@ -375,9 +375,8 @@ Los Secrets de prod están en `credentials/prod/`, cifrados con **su propia clav
 ## 7. Límites conocidos
 
 - Con solo 2 laptops, el plano de control de K3s **no es de alta disponibilidad** (etcd necesita 3 miembros, o 1). El modo desarrollo (sección 5) sí tiene 3 nodos con etcd.
-- La API se conecta a `galera1` directo en Compose (`DB_HOST: galera1`), aunque el README dice `galera-lb`. Si `galera1` cae, la API falla. En Kubernetes esto se resuelve con un proxy de base de datos.
+- La API se conecta a `galera1` directo en Compose (`DB_HOST: galera1`), no a `galera-lb`. Si `galera1` cae, la API falla. En Kubernetes esto se resuelve con un proxy de base de datos.
 - HAProxy (Parte 1) no tiene `option redispatch`: cuando un nodo web cae por pocos segundos, las peticiones que le tocan esperan hasta ~8 s. Se midió en las pruebas de Chaos Monkey.
-- El README de la Parte 1 dice Nagios en el puerto 8080 con clave `nagios`. Lo real es el puerto 8088 y la clave del `.env`.
 - **Reinicio de la laptop con k3d:** si `kubectl` responde `ServiceUnavailable` más de 2 minutos, Docker pudo reasignar las IP de los nodos (etcd las busca en las direcciones viejas y no forma quórum). Compruébalo y recupéralo sin borrar nada:
   ```bash
   docker inspect -f '{{.Name}} {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' k3d-tienda-server-0 k3d-tienda-server-1 k3d-tienda-server-2   # esperado: .2, .3 y .4

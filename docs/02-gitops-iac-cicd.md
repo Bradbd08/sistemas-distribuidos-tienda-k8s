@@ -37,7 +37,7 @@ estado vive dentro del clúster, así que `prod-nodes` es una raíz aparte con e
 
 ## FluxCD (`clusters/<entorno>`)
 
-Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` → `apps` → `network-policies` (cada una espera a las que necesita). `notifications` depende de `apps` y está suspendida hasta tener su token.
+Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` → `apps` → `network-policies` (cada una espera a las que necesita). `notifications` depende de `apps`.
 
 | Caso de uso del plan | Cómo se resuelve |
 |---|---|
@@ -47,7 +47,7 @@ Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` �
 | Corrección de deriva y rollback | Flux revierte cambios manuales; el rollback es `git revert` |
 | Secretos | SOPS con age: `credentials/<entorno>/*.yaml` cifrado; Flux descifra con `flux-system/sops-age` |
 | Automatización de imágenes | `clusters/prod/image-automation.yaml` (ver límites) |
-| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. Suspendido hasta tener el token |
+| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. El token está cifrado en `credentials/<entorno>/github-token.yaml` |
 
 **Protección de datos:** las capas `data` y `secrets` no usan `prune`, tienen `deletionPolicy: Orphan`, y los namespaces y las bases de
 datos llevan `prune: disabled`. Borrar un archivo del repositorio no borra una base de datos ni sus volúmenes.

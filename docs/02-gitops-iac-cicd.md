@@ -47,7 +47,7 @@ Capas con `dependsOn`: `operators` → `secrets` → `data` y `observability` �
 | Corrección de deriva y rollback | Flux revierte cambios manuales; el rollback es `git revert` |
 | Secretos | SOPS con age: `credentials/<entorno>/*.yaml` cifrado; Flux descifra con `flux-system/sops-age` |
 | Automatización de imágenes | `clusters/prod/image-automation.yaml` (ver límites) |
-| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. Suspendido hasta tener el token |
+| Notificaciones | `deploy/platform/notifications/`: estado del commit en GitHub. El token está cifrado en `credentials/<entorno>/github-token.yaml` |
 
 **Protección de datos:** las capas `data` y `secrets` no usan `prune`, tienen `deletionPolicy: Orphan`, y los namespaces y las bases de
 datos llevan `prune: disabled`. Borrar un archivo del repositorio no borra una base de datos ni sus volúmenes.
